@@ -3,16 +3,36 @@ package kc.ac.uc.clubplatform
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.activity.result.contract.ActivityResultContracts
 import kc.ac.uc.clubplatform.databinding.ActivityBoardBinding
 import kc.ac.uc.clubplatform.adapters.PostAdapter
+import kc.ac.uc.clubplatform.adapters.CommentAdapter
 import kc.ac.uc.clubplatform.models.Post
 
 class BoardActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBoardBinding
     private lateinit var boardType: String
     private var postId: Int? = null
+    private val comments = mutableListOf<String>() // 댓글 리스트
+    private lateinit var commentsAdapter: CommentAdapter // 댓글 어댑터
+    private val posts = mutableListOf<Post>() // 게시글 리스트
+    private lateinit var postAdapter: PostAdapter // 게시글 어댑터
+
+    private val writePostLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val newPost = result.data?.getParcelableExtra<Post>("new_post")
+            if (newPost != null) {
+                posts.add(0, newPost) // 새 게시글을 리스트 맨 앞에 추가
+                postAdapter.notifyItemInserted(0)
+                binding.rvPosts.scrollToPosition(0)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,13 +85,14 @@ class BoardActivity : AppCompatActivity() {
         binding.fabWritePost.setOnClickListener {
             val intent = Intent(this, WritePostActivity::class.java)
             intent.putExtra("board_type", boardType)
-            startActivity(intent)
+            writePostLauncher.launch(intent) // 게시글 작성 화면으로 이동
         }
 
         // 게시글 목록 표시
-        val posts = getDummyPosts()
+        posts.clear()
+        posts.addAll(getDummyPosts())
 
-        val adapter = PostAdapter(posts) { post ->
+        postAdapter = PostAdapter(posts) { post ->
             // 게시글 클릭 시 해당 게시글 상세 페이지로 이동
             val intent = Intent(this, BoardActivity::class.java)
             intent.putExtra("board_type", boardType)
@@ -80,7 +101,7 @@ class BoardActivity : AppCompatActivity() {
         }
 
         binding.rvPosts.layoutManager = LinearLayoutManager(this)
-        binding.rvPosts.adapter = adapter
+        binding.rvPosts.adapter = postAdapter
         binding.rvPosts.visibility = android.view.View.VISIBLE
         binding.layoutPostDetail.visibility = android.view.View.GONE
     }
@@ -102,12 +123,26 @@ class BoardActivity : AppCompatActivity() {
         binding.rvPosts.visibility = android.view.View.GONE
         binding.layoutPostDetail.visibility = android.view.View.VISIBLE
 
+        // 댓글 RecyclerView 설정
+        commentsAdapter = CommentAdapter(comments)
+        binding.rvComments.layoutManager = LinearLayoutManager(this)
+        binding.rvComments.adapter = commentsAdapter
+
         // 댓글 전송 버튼
         binding.btnSendComment.setOnClickListener {
             val commentText = binding.etComment.text.toString()
             if (commentText.isNotEmpty()) {
-                // 댓글 전송 처리 (생략)
-                binding.etComment.text.clear()
+                // 댓글 리스트에 추가
+                comments.add(commentText)
+
+                // RecyclerView 업데이트
+                commentsAdapter.notifyItemInserted(comments.size - 1)
+                binding.rvComments.scrollToPosition(comments.size - 1)
+
+                // 입력 필드 초기화
+                binding.etComment.setText("")
+            } else {
+                Toast.makeText(this, "댓글을 입력하세요.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -125,9 +160,8 @@ class BoardActivity : AppCompatActivity() {
                 Post(6, "효율적인 시간 관리 방법", "1. 투두리스트 활용하기\n2. 뽀모도로 기법 시도해보기\n3. 일정표 만들기", "시간관리장인", "2025-04-15", 56, 14)
             )
             else -> listOf(
-                Post(7, "동아리 스터디 같이하실 분", "알고리즘 스터디 같이 하실 분 구합니다. 주 2회, 2시간씩 진행 예정입니다.", "홍길동", "2025-05-02", 12, 3),
-                Post(8, "프로젝트 팀원 모집", "안드로이드 앱 개발 프로젝트 함께 하실 분 모집합니다.", "이몽룡", "2025-05-01", 20, 5),
-                Post(9, "지난 행사 사진 공유합니다", "지난 주 워크샵 사진 공유합니다. 즐거운 시간이었네요!", "사진담당", "2025-04-29", 34, 7)
+                Post(7, "동아리 스터디 같이하실 분", "알고리즘 스터디 같이 하실 분 구합니다. 매주 화요일 오후 7시에 진행 예정입니다.", "스터디장", "2025-05-01", 20, 4),
+                Post(8, "자유게시판 테스트", "이 게시글은 자유게시판 테스트용입니다.", "테스터", "2025-05-02", 10, 2)
             )
         }
     }
