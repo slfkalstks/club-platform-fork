@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Progress Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:id="@+id/progressStep1"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/progress_step_background"
+            android:gravity="center"
+            android:text="1"
+            android:textColor="@color/white"
+            android:textSize="18sp"/>
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="2dp"
+            android:background="@color/light_gray"/>
+
+        <TextView
+            android:id="@+id/progressStep2"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/progress_step_background"
+            android:gravity="center"
+            android:text="2"
+            android:textColor="@color/white"
+            android:textSize="18sp"/>
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="2dp"
+            android:background="@color/light_gray"/>
+
+        <TextView
+            android:id="@+id/progressStep3"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/progress_step_background"
+            android:gravity="center"
+            android:text="3"
+            android:textColor="@color/white"
+            android:textSize="18sp"/>
+    </LinearLayout>
+
+    <!-- Step 1 - School Information -->
+    <LinearLayout
+        android:id="@+id/layoutStep1"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="학교 정보 입력"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <EditText
+            android:id="@+id/etSchoolName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="학교명"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"
+            android:layout_marginBottom="12dp"/>
+
+        <EditText
+            android:id="@+id/etSchoolEmail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="학교 이메일"
+            android:inputType="textEmailAddress"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"
+            android:layout_marginBottom="12dp"/>
+
+        <EditText
+            android:id="@+id/etDepartment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="학과"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"
+            android:layout_marginBottom="12dp"/>
+
+        <EditText
+            android:id="@+id/etMajor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="전공"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"
+            android:layout_marginBottom="12dp"/>
+
+        <EditText
+            android:id="@+id/etStudentId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="학번"
+            android:inputType="number"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"/>
+    </LinearLayout>
+
+    <!-- Step 2 - Password -->
+    <LinearLayout
+        android:id="@+id/layoutStep2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="비밀번호 설정"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <EditText
+            android:id="@+id/etEmailDisabled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="학교 이메일"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_disabled_background"
+            android:enabled="false"
+            android:layout_marginBottom="12dp"/>
+
+        <EditText
+            android:id="@+id/etPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="비밀번호"
+            android:inputType="textPassword"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"
+            android:layout_marginBottom="12dp"/>
+
+        <EditText
+            android:id="@+id/etConfirmPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="비밀번호 확인"
+            android:inputType="textPassword"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"/>
+    </LinearLayout>
+
+    <!-- Step 3 - Club Search -->
+    <LinearLayout
+        android:id="@+id/layoutStep3"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="동아리 검색"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <EditText
+            android:id="@+id/etClubName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="동아리 이름"
+            android:padding="12dp"
+            android:background="@drawable/edit_text_background"
+            android:drawableEnd="@drawable/ic_search"
+            android:layout_marginBottom="12dp"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvClubList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/recycler_view_background" />
+    </LinearLayout>
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
+
+        <Button
+            android:id="@+id/btnCancel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="취소"
+            android:backgroundTint="@color/light_gray"
+            android:textColor="@color/dark_gray"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btnPrevious"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="이전"
+            android:backgroundTint="@color/colorSecondary"
+            android:textColor="@color/white"
+            android:visibility="gone"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btnNext"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="다음"
+            android:backgroundTint="@color/colorPrimary"
+            android:textColor="@color/white"/>
+    </LinearLayout>
+</LinearLayout>
