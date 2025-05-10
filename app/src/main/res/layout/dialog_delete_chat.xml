@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="채팅방 삭제"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/colorPrimary"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="삭제할 채팅방을 선택해주세요."
+        android:textSize="14sp"
+        android:gravity="center"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- 채팅방 목록 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvChatsToDelete"
+        android:layout_width="match_parent"
+        android:layout_height="250dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_recycler_view"/>
+
+    <!-- 선택된 채팅방 개수 -->
+    <TextView
+        android:id="@+id/tvSelectedCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0개 선택됨"
+        android:textSize="14sp"
+        android:gravity="end"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- 버튼 영역 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnCancel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="취소"
+            android:backgroundTint="@color/colorSecondary"
+            android:textColor="@color/white"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btnDelete"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="삭제하기"
+            android:backgroundTint="#FF5252"
+            android:textColor="@color/white"/>
+    </LinearLayout>
+</LinearLayout>
