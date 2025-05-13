@@ -46,6 +46,17 @@ class BoardListFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
+        // 샘플 데이터 추가
+        boards.clear()
+        boards.add(Board(1, "내가 쓴 글", "my_posts", "내가 작성한 게시글 모아보기"))
+        boards.add(Board(2, "댓글 단 글", "my_comments", "내가 댓글을 작성한 게시글 모아보기"))
+        boards.add(Board(3, "스크랩", "my_scraps", "내가 스크랩한 게시글 모아보기"))
+        boards.add(Board(4, "HOT 게시판", "hot", "일주일 내 인기 게시글 (20+ 활동)"))
+        boards.add(Board(5, "BEST 게시판", "best", "한달 내 인기 게시글 (50+ 활동)"))
+        boards.add(Board(6, "일반게시판", "general", "자유롭게 소통하는 게시판"))
+        boards.add(Board(7, "공지게시판", "notice", "동아리 공지사항을 확인하는 게시판"))
+        boards.add(Board(8, "Tips", "tips", "유용한 정보를 공유하는 게시판"))
+
         val adapter = BoardAdapter(boards) { board ->
             // 게시판 클릭 이벤트 처리
             val intent = Intent(requireContext(), BoardActivity::class.java)
@@ -55,10 +66,5 @@ class BoardListFragment : Fragment() {
 
         binding.rvBoards.layoutManager = LinearLayoutManager(requireContext())
         binding.rvBoards.adapter = adapter
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
     }
 }

@@ -119,21 +119,117 @@ class ScheduleFragment : Fragment() {
 
         if (filteredSchedules.isEmpty()) {
             binding.tvNoSchedule.visibility = View.VISIBLE
-            binding.rvSchedules.visibility = View.GONE
+            binding.tvScheduleList.visibility = View.GONE
         } else {
             binding.tvNoSchedule.visibility = View.GONE
-            binding.rvSchedules.visibility = View.VISIBLE
-
-            // 여기에 일정 목록 어댑터 설정 (생략)
-            // binding.rvSchedules.adapter = ScheduleAdapter(filteredSchedules)
-
-            // 간단히 텍스트로 표시 (예시)
-            val scheduleText = filteredSchedules.joinToString("\n\n") {
-                "${it.title}\n${it.place}\n${it.time}"
-            }
-            binding.tvScheduleList.text = scheduleText
             binding.tvScheduleList.visibility = View.VISIBLE
+
+            // 일정 목록 텍스트 구성
+            val sb = StringBuilder()
+            for (schedule in filteredSchedules) {
+                sb.append("■ ${schedule.title}\n")
+                sb.append("  장소: ${schedule.place}\n")
+                sb.append("  시간: ${schedule.time}\n\n")
+            }
+            binding.tvScheduleList.text = sb.toString()
+
+            // 일정 편집/삭제 기능 구현 (간단하게 각 일정을 길게 누르면 메뉴 표시)
+            binding.tvScheduleList.setOnLongClickListener {
+                if (filteredSchedules.isNotEmpty()) {
+                    showScheduleOptionsDialog(filteredSchedules)
+                }
+                true
+            }
         }
+    }
+
+    // 일정 관리 옵션 대화상자 표시
+    private fun showScheduleOptionsDialog(scheduleList: List<Schedule>) {
+        val scheduleItems = scheduleList.map { it.title }.toTypedArray()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("관리할 일정 선택")
+            .setItems(scheduleItems) { _, which ->
+                val selectedSchedule = scheduleList[which]
+                showScheduleActionDialog(selectedSchedule)
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    // 일정 관리 액션 대화상자 표시
+    private fun showScheduleActionDialog(schedule: Schedule) {
+        val options = arrayOf("일정 수정", "일정 삭제")
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(schedule.title)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showEditScheduleDialog(schedule)
+                    1 -> showDeleteScheduleDialog(schedule)
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    // 일정 수정 다이얼로그
+    private fun showEditScheduleDialog(schedule: Schedule) {
+        val dialogBinding = DialogAddScheduleBinding.inflate(layoutInflater)
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+        // 기존 일정 정보로 초기화
+        dialogBinding.etTitle.setText(schedule.title)
+        dialogBinding.etDate.setText(dateFormat.format(schedule.date))
+        dialogBinding.etTime.setText(schedule.time)
+        dialogBinding.etPlace.setText(schedule.place)
+        dialogBinding.etContent.setText(schedule.content)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("일정 수정")
+            .setView(dialogBinding.root)
+            .setPositiveButton("수정") { _, _ ->
+                val title = dialogBinding.etTitle.text.toString()
+                val place = dialogBinding.etPlace.text.toString()
+                val time = dialogBinding.etTime.text.toString()
+                val content = dialogBinding.etContent.text.toString()
+
+                if (title.isNotEmpty()) {
+                    // 기존 일정 삭제
+                    schedules.remove(schedule)
+
+                    // 수정된 일정 추가
+                    val updatedSchedule = Schedule(
+                        schedule.id,
+                        title,
+                        place,
+                        selectedDate,
+                        time,
+                        content
+                    )
+                    schedules.add(updatedSchedule)
+                    updateScheduleList()
+                    Toast.makeText(requireContext(), "일정이 수정되었습니다", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(requireContext(), "일정 제목을 입력해주세요", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    // 일정 삭제 다이얼로그
+    private fun showDeleteScheduleDialog(schedule: Schedule) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("일정 삭제")
+            .setMessage("정말 이 일정을 삭제하시겠습니까?")
+            .setPositiveButton("삭제") { _, _ ->
+                schedules.remove(schedule)
+                updateScheduleList()
+                Toast.makeText(requireContext(), "일정이 삭제되었습니다", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("취소", null)
+            .show()
     }
 
     override fun onDestroyView() {

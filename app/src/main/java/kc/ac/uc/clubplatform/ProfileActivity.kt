@@ -1,6 +1,7 @@
 // ProfileActivity.kt
 package kc.ac.uc.clubplatform
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -8,9 +9,29 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import kc.ac.uc.clubplatform.databinding.ActivityProfileBinding
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.*
 
 class ProfileActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileBinding
+
+    // ProfileActivity 클래스 내부에 추가
+    private val REQUEST_IMAGE_CAPTURE = 1
+    private val REQUEST_GALLERY_IMAGE = 2
+    private val REQUEST_PERMISSION = 100
+    private var currentPhotoPath: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,22 +103,54 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun showDepartmentSettingDialog() {
-        // 학과 설정 화면으로 전환 (실제 구현에서는 별도의 액티비티나 다이얼로그로 구현)
-        Toast.makeText(this, "학과 설정 화면으로 이동합니다", Toast.LENGTH_SHORT).show()
+        // 학과 선택 다이얼로그 표시
+        val departments = arrayOf(
+            "컴퓨터공학과", "소프트웨어학과", "정보통신공학과", "전자공학과",
+            "기계공학과", "건축공학과", "산업공학과", "화학공학과",
+            "경영학과", "경제학과", "국어국문학과", "영어영문학과",
+            "법학과", "행정학과", "심리학과", "사회학과"
+        )
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("학과 선택")
+
+        builder.setItems(departments) { _, which ->
+            val selectedDepartment = departments[which]
+            binding.tvMajor.text = selectedDepartment
+            Toast.makeText(this, "학과가 변경되었습니다", Toast.LENGTH_SHORT).show()
+        }
+
+        builder.setNegativeButton("취소", null)
+        builder.show()
     }
 
+
     private fun showProfileImageOptions() {
-        val options = arrayOf("프로필 사진 변경", "프로필 사진 삭제")
+        val options = arrayOf("카메라로 촬영", "갤러리에서 선택", "프로필 사진 삭제")
         AlertDialog.Builder(this)
             .setTitle("프로필 사진")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> {
-                        // 갤러리에서 이미지 선택 (실제 구현에서는 Intent 사용)
-                        Toast.makeText(this, "갤러리에서 이미지를 선택해주세요", Toast.LENGTH_SHORT).show()
+                        // 카메라 권한 확인 없이 간단하게 구현
+                        try {
+                            val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                            if (takePictureIntent.resolveActivity(packageManager) != null) {
+                                startActivityForResult(takePictureIntent, 1001)
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(this, "카메라를 실행할 수 없습니다", Toast.LENGTH_SHORT).show()
+                        }
                     }
                     1 -> {
+                        // 갤러리 실행
+                        val intent = Intent(Intent.ACTION_PICK)
+                        intent.type = "image/*"
+                        startActivityForResult(intent, 1002)
+                    }
+                    2 -> {
                         // 프로필 이미지 삭제
+                        binding.ivProfileImage.setImageResource(R.drawable.ic_profile)
                         Toast.makeText(this, "프로필 사진이 삭제되었습니다", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -157,5 +210,26 @@ class ProfileActivity : AppCompatActivity() {
             }
             .setNegativeButton("취소", null)
             .show()
+    }
+
+    // onActivityResult 메소드 추가 또는 수정
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == Activity.RESULT_OK) {
+            when (requestCode) {
+                1001 -> { // 카메라
+                    val imageBitmap = data?.extras?.get("data") as? Bitmap
+                    if (imageBitmap != null) {
+                        binding.ivProfileImage.setImageBitmap(imageBitmap)
+                    }
+                }
+                1002 -> { // 갤러리
+                    val selectedImageUri = data?.data
+                    if (selectedImageUri != null) {
+                        binding.ivProfileImage.setImageURI(selectedImageUri)
+                    }
+                }
+            }
+        }
     }
 }
