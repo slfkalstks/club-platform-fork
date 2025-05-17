@@ -50,8 +50,15 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
 
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0' // XML 대신 JSON 변환기 사용
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.1'
+
+    // RecyclerView
+    implementation 'androidx.recyclerview:recyclerview:1.2.1'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
