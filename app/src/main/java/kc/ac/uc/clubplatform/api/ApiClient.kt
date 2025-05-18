@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
     private const val BASE_URL = "https://www.career.go.kr/cnet/openapi/"
-    private const val SERVER_BASE_URL = "http://10.0.2.2:8080/api/" // 로컬 서버 URL로 변경
+    private const val SERVER_BASE_URL = "http://hide-ipv4.xyz/api/"
     const val API_KEY = "f2f6128e7cab84a695ad3ff381ff6b04"
 
     private val okHttpClient = OkHttpClient.Builder()

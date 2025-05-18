@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     // 명시적으로 프로토콜을 http로 지정
-    private const val BASE_URL = "http://10.0.2.2:8080/api/"
+    private const val BASE_URL = "http://hide-ipv4.xyz/api/"
     // 추후 IP 주소 업데이트
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
@@ -33,7 +33,7 @@ object RetrofitClient {
                     if (hostname == "hide-ipv4.xyz") {
                         try {
                             // 서버 IP 주소를 직접 지정
-                            listOf(InetAddress.getByName("118.35.116.114:8080"))
+                            listOf(InetAddress.getByName("35.193.194.46:8080"))
                         } catch (e: Exception) {
                             throw UnknownHostException("Unable to resolve host $hostname")
                         }
