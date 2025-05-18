@@ -86,6 +86,20 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
+                <!-- 태그 표시 -->
+                <TextView
+                    android:id="@+id/tvPostTag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="일반"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/badge_light_background"
+                    android:visibility="visible"/>
+
                 <!-- Post Header -->
                 <TextView
                     android:id="@+id/tvPostTitle"
@@ -191,20 +205,6 @@
                         android:layout_marginEnd="8dp"/>
 
                     <Button
-                        android:id="@+id/btnComment"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="댓글"
-                        android:textSize="14sp"
-                        android:backgroundTint="@color/light_gray"
-                        android:textColor="@color/dark_gray"
-                        android:drawableStart="@drawable/ic_comment"
-                        android:paddingStart="24dp"
-                        android:paddingEnd="24dp"
-                        android:layout_marginEnd="8dp"/>
-
-                    <Button
                         android:id="@+id/btnScrap"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -270,7 +270,7 @@
                 android:layout_height="40dp"
                 android:src="@drawable/ic_send"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:tint="@color/colorPrimary"/>
+                app:tint="@color/colorPrimary" />
         </LinearLayout>
     </LinearLayout>
 
