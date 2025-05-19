@@ -131,23 +131,8 @@ class ProfileActivity : AppCompatActivity() {
             .setTitle("프로필 사진")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> {
-                        // 카메라 권한 확인 없이 간단하게 구현
-                        try {
-                            val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                            if (takePictureIntent.resolveActivity(packageManager) != null) {
-                                startActivityForResult(takePictureIntent, 1001)
-                            }
-                        } catch (e: Exception) {
-                            Toast.makeText(this, "카메라를 실행할 수 없습니다", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    1 -> {
-                        // 갤러리 실행
-                        val intent = Intent(Intent.ACTION_PICK)
-                        intent.type = "image/*"
-                        startActivityForResult(intent, 1002)
-                    }
+                    0 -> checkCameraPermission()
+                    1 -> openGallery()
                     2 -> {
                         // 프로필 이미지 삭제
                         binding.ivProfileImage.setImageResource(R.drawable.ic_profile)
@@ -212,22 +197,89 @@ class ProfileActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun checkCameraPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                REQUEST_PERMISSION
+            )
+        } else {
+            dispatchTakePictureIntent()
+        }
+    }
+
+    private fun openGallery() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        startActivityForResult(intent, REQUEST_GALLERY_IMAGE)
+    }
+
+
+    @Throws(IOException::class)
+    private fun createImageFile(): File {
+        // 이미지 파일 이름 생성
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile(
+            "JPEG_${timeStamp}_",
+            ".jpg",
+            storageDir
+        ).apply {
+            currentPhotoPath = absolutePath
+        }
+    }
+
+    private fun dispatchTakePictureIntent() {
+        Intent(MediaStore.ACTION_IMAGE_CAPTURE).also { takePictureIntent ->
+            takePictureIntent.resolveActivity(packageManager)?.also {
+                val photoFile: File? = try {
+                    createImageFile()
+                } catch (ex: IOException) {
+                    null
+                }
+                photoFile?.also {
+                    val photoURI: Uri = FileProvider.getUriForFile(
+                        this,
+                        "kc.ac.uc.clubplatform.fileprovider",
+                        it
+                    )
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
+                }
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                dispatchTakePictureIntent()
+            } else {
+                Toast.makeText(this, "카메라 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // onActivityResult 메소드 추가 또는 수정
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == Activity.RESULT_OK) {
             when (requestCode) {
-                1001 -> { // 카메라
-                    val imageBitmap = data?.extras?.get("data") as? Bitmap
-                    if (imageBitmap != null) {
-                        binding.ivProfileImage.setImageBitmap(imageBitmap)
-                    }
+                REQUEST_IMAGE_CAPTURE -> {
+                    // 카메라로 찍은 사진 처리
+                    val bitmap = BitmapFactory.decodeFile(currentPhotoPath)
+                    binding.ivProfileImage.setImageBitmap(bitmap)
                 }
-                1002 -> { // 갤러리
-                    val selectedImageUri = data?.data
-                    if (selectedImageUri != null) {
-                        binding.ivProfileImage.setImageURI(selectedImageUri)
-                    }
+                REQUEST_GALLERY_IMAGE -> {
+                    // 갤러리에서 선택한 사진 처리
+                    val selectedImage = data?.data
+                    binding.ivProfileImage.setImageURI(selectedImage)
                 }
             }
         }
