@@ -38,7 +38,6 @@ import java.util.Base64
 class RegisterActivity : AppCompatActivity() {
     private lateinit var binding: ActivityRegisterBinding
     private var selectedSchool: School? = null
-    private lateinit var careerNetClient: CareerNetApiClient
     private var profileImageUri: Uri? = null
     private var encodedImage: String? = null
 
@@ -55,8 +54,6 @@ class RegisterActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        careerNetClient = CareerNetApiClient(ApiClient.API_KEY)
 
         setupUI()
     }
@@ -142,7 +139,7 @@ class RegisterActivity : AppCompatActivity() {
     ) {
         lifecycleScope.launch {
             try {
-                val result = careerNetClient.searchUniversity(schoolName)
+                val result = CareerNetApiClient.searchUniversity(schoolName)
                 val schools = parseSchoolsFromJsonResponse(result)
 
                 progressBar.visibility = View.GONE
@@ -199,7 +196,7 @@ class RegisterActivity : AppCompatActivity() {
     private fun loadDepartmentInfo(schoolCode: String) {
         lifecycleScope.launch {
             try {
-                val depInfoResult = careerNetClient.getDepartmentInfo(schoolCode)
+                val depInfoResult = CareerNetApiClient.getDepartmentInfo(schoolCode)
                 val departments = parseDepartmentsFromJsonResponse(depInfoResult)
 
                 // 첫 번째 학과로 학과 필드 자동 채우기 (있는 경우)

@@ -7,11 +7,11 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kc.ac.uc.clubplatform.MainActivity
+import kc.ac.uc.clubplatform.api.ApiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kc.ac.uc.clubplatform.api.RetrofitClient
 import kc.ac.uc.clubplatform.databinding.ActivityLoginBinding
 import kc.ac.uc.clubplatform.models.LoginRequest
 import java.net.SocketTimeoutException
@@ -81,7 +81,7 @@ class LoginActivity : AppCompatActivity() {
                 val loginRequest = LoginRequest(email, password)
                 Log.d(TAG, "로그인 시도: $email")
 
-                val response = RetrofitClient.apiService.login(loginRequest)
+                val response = ApiClient.apiService.login(loginRequest)
 
                 withContext(Dispatchers.Main) {
                     showLoading(false)
