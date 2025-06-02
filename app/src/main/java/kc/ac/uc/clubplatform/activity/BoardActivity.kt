@@ -1,8 +1,9 @@
 // BoardActivity.kt
-package kc.ac.uc.clubplatform
+package kc.ac.uc.clubplatform.activity
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -102,8 +103,8 @@ class BoardActivity : AppCompatActivity() {
 
         binding.rvPosts.layoutManager = LinearLayoutManager(this)
         binding.rvPosts.adapter = postAdapter
-        binding.rvPosts.visibility = android.view.View.VISIBLE
-        binding.layoutPostDetail.visibility = android.view.View.GONE
+        binding.rvPosts.visibility = View.VISIBLE
+        binding.layoutPostDetail.visibility = View.GONE
     }
 
     private fun showPostDetail(postId: Int) {
@@ -120,8 +121,8 @@ class BoardActivity : AppCompatActivity() {
         binding.tvPostViewCount.text = post.viewCount.toString()
         binding.tvPostCommentCount.text = post.commentCount.toString()
 
-        binding.rvPosts.visibility = android.view.View.GONE
-        binding.layoutPostDetail.visibility = android.view.View.VISIBLE
+        binding.rvPosts.visibility = View.GONE
+        binding.layoutPostDetail.visibility = View.VISIBLE
 
         // 댓글 RecyclerView 설정
         commentsAdapter = CommentAdapter(comments)

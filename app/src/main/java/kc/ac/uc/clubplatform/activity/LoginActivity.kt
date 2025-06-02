@@ -1,4 +1,4 @@
-package kc.ac.uc.clubplatform
+package kc.ac.uc.clubplatform.activity
 
 import android.content.Intent
 import android.os.Bundle
@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import kc.ac.uc.clubplatform.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,8 +26,15 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 연결 테스트 - 앱 시작 시 실행
-        testApiConnection()
+        // 로컬 저장소에서 로그인 정보 불러오기 ( 토큰 사용으로 추후 업데이트 예정 )
+        val sharedPref = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        val id = sharedPref.getString("id", null)
+        val pw = sharedPref.getString("pw", null)
+
+        if (id != null && pw != null) {
+            // 자동 로그인 시도 (서버에 id, pw를 보내 인증)
+            performLogin(id, pw)
+        }
 
         binding.btnLogin.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
@@ -40,36 +48,9 @@ class LoginActivity : AppCompatActivity() {
         binding.btnSignup.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
-    }
-
-    private fun testApiConnection() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Log.d(TAG, "API 연결 테스트 시작...")
-                val response = RetrofitClient.apiService.testConnection()
-                withContext(Dispatchers.Main) {
-                    if (response.isSuccessful) {
-                        Log.d(TAG, "API 연결 성공! 응답 코드: ${response.code()}")
-                        Toast.makeText(this@LoginActivity,
-                            "서버 연결 확인 완료", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Log.w(TAG, "API 연결 실패. 응답 코드: ${response.code()}")
-                        Toast.makeText(this@LoginActivity,
-                            "서버 응답: ${response.code()}", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "API 연결 테스트 중 예외 발생: ${e.javaClass.simpleName}: ${e.message}")
-                withContext(Dispatchers.Main) {
-                    val message = when (e) {
-                        is UnknownHostException -> "서버 주소를 찾을 수 없습니다"
-                        is SocketTimeoutException -> "서버 응답 시간 초과"
-                        else -> "서버 연결 오류: ${e.message}"
-                    }
-                    Toast.makeText(this@LoginActivity, message, Toast.LENGTH_LONG).show()
-                }
-            }
-        }
+        //테스트용
+        binding.etEmail.setText("test@test.com")
+        binding.etPassword.setText("123123123")
     }
 
     private fun validateInputs(email: String, password: String): Boolean {
@@ -110,14 +91,26 @@ class LoginActivity : AppCompatActivity() {
 
                         if (loginResponse.success) {
                             // 로그인 성공
+
+
+                            saveLoginInfo(email, password)  // 로그인 정보 저장 (로컬 저장소에)
+
                             Toast.makeText(
                                 this@LoginActivity,
                                 "로그인 성공!",
                                 Toast.LENGTH_SHORT
                             ).show()
 
-                            // 토큰 저장
-                            saveUserSession(loginResponse.token, loginResponse.userId.toString())
+                            // 토큰 저장 ( 토큰은 사용할지 미지수 / 로컬에서 바로 받아올수 있지만 보안 이슈)
+                            val token = loginResponse.token
+                            val userId = loginResponse.userId?.toString()
+                            if (token != null && userId != null) {
+                                saveUserSession(token, userId)
+                                val intent = Intent(this@LoginActivity, MainActivity::class.java)
+                                startActivity(intent)
+                                finish()
+                            }
+                            Log.d(TAG, "로그인 성공: 토큰=$token, userId=$userId")
 
                             // 메인 화면으로 이동
                             val intent = Intent(this@LoginActivity, MainActivity::class.java)
@@ -175,6 +168,16 @@ class LoginActivity : AppCompatActivity() {
             putString("auth_token", token)
             putString("user_id", userId)
             putBoolean("is_logged_in", true)
+            apply()
+        }
+        Log.d(TAG, "세션 저장: token=$token, userId=$userId")
+    }
+
+    private fun saveLoginInfo(id: String, pw: String) {
+        val sharedPref = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        with(sharedPref.edit()) {
+            putString("id", id)
+            putString("pw", pw)
             apply()
         }
     }
