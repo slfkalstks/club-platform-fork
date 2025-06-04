@@ -3,11 +3,16 @@ package kc.ac.uc.clubplatform.activity
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import kc.ac.uc.clubplatform.R
+import kc.ac.uc.clubplatform.api.ApiClient
+import kc.ac.uc.clubplatform.api.LogoutRequest
 import kc.ac.uc.clubplatform.databinding.ActivityProfileBinding
+import kotlinx.coroutines.launch
 
 class ProfileActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileBinding
@@ -63,7 +68,7 @@ class ProfileActivity : AppCompatActivity() {
 
         // 로그아웃 버튼
         binding.btnLogout.setOnClickListener {
-            showLogoutDialog()
+            performLogout()
         }
     }
 
@@ -141,21 +146,120 @@ class ProfileActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun performLogout() {
+        // 로그아웃 버튼 클릭 시 확인 다이얼로그 표시
+        showLogoutDialog()
+    }
+
     private fun showLogoutDialog() {
         AlertDialog.Builder(this)
             .setTitle("로그아웃")
             .setMessage("정말 로그아웃 하시겠습니까?")
             .setPositiveButton("로그아웃") { _, _ ->
-                // 로그아웃 로직 (세션 정보 삭제 등)
-                Toast.makeText(this, "로그아웃 되었습니다", Toast.LENGTH_SHORT).show()
-
-                // 로그인 화면으로 이동
-                val intent = Intent(this, LoginActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-                finish()
+                executeLogout()
             }
             .setNegativeButton("취소", null)
             .show()
+    }
+
+    private fun executeLogout() {
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+
+                val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+                val refreshToken = sharedPreferences.getString("refresh_token", "") ?: ""
+                val logoutRequest = LogoutRequest(refreshToken)
+                val response = ApiClient.apiService.logout(logoutRequest)
+
+                if (response.isSuccessful && response.body()?.success == true) {
+                    // 로그인 정보 삭제
+                    sharedPreferences.edit().apply {
+                        clear()
+                        apply()
+                    }
+
+                    showToast("로그아웃 되었습니다")
+
+                    // 로그인 화면으로 이동
+                    val intent = Intent(this@ProfileActivity, LoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                } else {
+                    showToast("로그아웃에 실패했습니다: ${response.body()?.message ?: "알 수 없는 오류"}")
+                    Log.d("ProfileActivity", "Logout failed: ${response.errorBody()?.string()}")
+                }
+            } catch (e: Exception) {
+                showToast("로그아웃 중 오류가 발생했습니다: ${e.message}")
+            } finally {
+                showLoading(false)
+            }
+        }
+    }
+
+    /**
+     * 인증 토큰을 파기하는 함수
+     * SharedPreferences에서 토큰 및 사용자 정보 삭제
+     */
+    private fun clearAuthToken() {
+        // SharedPreferences에서 토큰 삭제
+        val sharedPreferences = getSharedPreferences("ClubPlatformPrefs", MODE_PRIVATE)
+        sharedPreferences.edit().apply {
+            remove("auth_token")  // 인증 토큰 삭제
+            remove("user_id")     // 사용자 ID 삭제
+            remove("user_email")  // 사용자 이메일 삭제
+            // 필요한 다른 사용자 관련 데이터도 여기서 삭제
+            apply()
+        }
+
+        // 서버에 로그아웃 API 호출
+        lifecycleScope.launch {
+            try {
+                // refreshToken 가져오기
+                val refreshToken = getRefreshTokenFromStorage()
+                // LogoutRequest 객체 생성
+                val logoutRequest = LogoutRequest(refreshToken)
+                // 파라미터와 함께 로그아웃 API 호출
+                val response = ApiClient.apiService.logout(logoutRequest)
+                
+                if (response.isSuccessful) {
+                    // 서버측 토큰 무효화 성공
+                    // 이미 UI에서는 처리되었으므로 추가 작업 필요 없음
+                } else {
+                    // 서버 응답이 실패했지만 로컬 토큰은 삭제됨
+                    // 로그에만 기록
+                    println("로그아웃 API 실패: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                // 서버 통신 실패 시에도 로컬 토큰은 삭제됨
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun clearUserData() {
+        val sharedPreferences = getSharedPreferences("ClubPlatformPrefs", MODE_PRIVATE)
+        sharedPreferences.edit().clear().apply()
+    }
+
+    private fun navigateToLogin() {
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun getRefreshTokenFromStorage(): String {
+        val sharedPreferences = getSharedPreferences("ClubPlatformPrefs", MODE_PRIVATE)
+        return sharedPreferences.getString("refresh_token", "") ?: ""
+    }
+
+    private fun showLoading(isLoading: Boolean) {
+        // 로딩 UI 표시 로직 (예: ProgressBar 표시/숨김)
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }

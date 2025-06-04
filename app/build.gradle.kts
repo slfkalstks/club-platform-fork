@@ -38,8 +38,7 @@ android {
             buildConfigField("String", "CAREER_NET_API_URL", "\"https://www.career.go.kr/cnet/openapi/\"")
             buildConfigField("String", "CAREER_NET_OPENAPI_URL", "\"https://www.career.go.kr/cnet/openapi/getOpenApi\"")
             buildConfigField("String", "CAREER_NET_API_KEY", "\"f2f6128e7cab84a695ad3ff381ff6b04\"")
-            // 에뮬레이터용 localhost 주소
-            buildConfigField("String", "SERVER_BASE_URL", "\"http://10.0.2.2:8080/api/\"")
+            buildConfigField("String", "SERVER_BASE_URL", "\"http://hide-ipv4.xyz/api/\"")
         }
     }
 

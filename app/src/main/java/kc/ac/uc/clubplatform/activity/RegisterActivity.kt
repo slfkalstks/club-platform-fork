@@ -76,7 +76,8 @@ class RegisterActivity : AppCompatActivity() {
         // 가입 버튼
         binding.btnRegister.setOnClickListener {
             if (validateForm()) {
-                registerUser()
+                val userData = collectUserData()
+                performRegistration(userData)
             }
         }
 
@@ -346,8 +347,7 @@ class RegisterActivity : AppCompatActivity() {
         return Bitmap.createScaledBitmap(bitmap, width, height, true)
     }
 
-    private fun registerUser() {
-        // 입력값 가져오기
+    private fun collectUserData(): RegisterRequest {
         val name = binding.etName.text.toString().trim()
         val email = binding.etEmail.text.toString().trim()
         val password = binding.etPassword.text.toString()
@@ -356,11 +356,7 @@ class RegisterActivity : AppCompatActivity() {
         val major = binding.etMajor.text.toString().trim()
         val studentId = binding.etStudentId.text.toString().trim()
 
-        // 로딩 표시
-        showLoading(true)
-
-        // API 요청 객체 생성
-        val registerRequest = RegisterRequest(
+        return RegisterRequest(
             email = email,
             password = password,
             name = name,
@@ -370,50 +366,32 @@ class RegisterActivity : AppCompatActivity() {
             studentId = studentId,
             profileImage = encodedImage
         )
+    }
 
-        // 서버에 회원가입 요청
-        ApiClient.userService.registerUser(registerRequest).enqueue(object : Callback<RegisterResponse> {
-            override fun onResponse(call: Call<RegisterResponse>, response: Response<RegisterResponse>) {
-                showLoading(false)
+    private fun performRegistration(userData: RegisterRequest) {
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+                val response = ApiClient.apiService.registerUser(userData)
 
                 if (response.isSuccessful) {
                     val registerResponse = response.body()
                     if (registerResponse?.success == true) {
-                        Toast.makeText(this@RegisterActivity, "회원가입이 완료되었습니다", Toast.LENGTH_SHORT).show()
-
-                        // 로그인 화면으로 이동
-                        val intent = Intent(this@RegisterActivity, LoginActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
+                        // 회원가입 성공 처리
+                        showToast("회원가입이 완료되었습니다.")
+                        navigateToLogin() // 로그인 화면으로 이동
                     } else {
-                        Toast.makeText(this@RegisterActivity,
-                            registerResponse?.message ?: "회원가입에 실패했습니다",
-                            Toast.LENGTH_SHORT).show()
+                        showToast(registerResponse?.message ?: "회원가입에 실패했습니다.")
                     }
                 } else {
-                    // 에러 응답 처리
-                    try {
-                        val errorBody = response.errorBody()?.string()
-                        val errorJson = JSONObject(errorBody ?: "{}")
-                        val errorMessage = errorJson.optString("message", "회원가입에 실패했습니다")
-                        Toast.makeText(this@RegisterActivity, errorMessage, Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(this@RegisterActivity,
-                            "회원가입에 실패했습니다: ${response.code()}",
-                            Toast.LENGTH_SHORT).show()
-                    }
+                    showToast("회원가입 실패: ${response.message()}")
                 }
-            }
-
-            override fun onFailure(call: Call<RegisterResponse>, t: Throwable) {
+            } catch (e: Exception) {
+                showToast("회원가입 오류: ${e.message}")
+            } finally {
                 showLoading(false)
-                Toast.makeText(this@RegisterActivity,
-                    "네트워크 오류: ${t.message}",
-                    Toast.LENGTH_SHORT).show()
-                t.printStackTrace()
             }
-        })
+        }
     }
 
     private fun showLoading(isLoading: Boolean) {
@@ -424,6 +402,17 @@ class RegisterActivity : AppCompatActivity() {
             binding.progressBar.visibility = View.GONE
             binding.btnRegister.isEnabled = true
         }
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun navigateToLogin() {
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 
     data class UserRegistrationData(

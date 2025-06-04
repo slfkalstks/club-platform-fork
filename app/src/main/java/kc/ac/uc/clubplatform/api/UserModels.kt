@@ -1,17 +1,5 @@
 package kc.ac.uc.clubplatform.api
 
-import retrofit2.Call
-import retrofit2.http.Body
-import retrofit2.http.POST
-
-interface UserService {
-    @POST("auth/register")
-    fun registerUser(@Body userData: RegisterRequest): Call<RegisterResponse>
-
-    @POST("auth/login")
-    fun loginUser(@Body loginData: LoginRequest): Call<LoginResponse>
-}
-
 data class RegisterRequest(
     val email: String,
     val password: String,
@@ -37,12 +25,22 @@ data class LoginRequest(
 data class LoginResponse(
     val success: Boolean,
     val message: String,
-    val token: String?,
+    val accessToken: String?,
+    val refreshToken: String?,
     val user: User?
 )
 
+data class LogoutRequest(
+    val refreshToken: String
+)
+
+data class LogoutResponse(
+    val success: Boolean,
+    val message: String
+)
+
 data class User(
-    val user_id: Int,
+    val userId: Int,
     val email: String,
     val name: String,
     val university: String,
