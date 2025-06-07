@@ -11,7 +11,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
-import androidx.wear.compose.material.dialog.Dialog
 import kc.ac.uc.clubplatform.R
 import kc.ac.uc.clubplatform.databinding.FragmentScheduleBinding
 import kotlinx.coroutines.CoroutineScope
@@ -104,6 +103,16 @@ class ScheduleFragment : Fragment() {
             val etEndDate = dialogView.findViewById<EditText>(R.id.etEndDate)
             val etTime = dialogView.findViewById<EditText>(R.id.etTime)
             val etContent = dialogView.findViewById<EditText>(R.id.etContent)
+            val btnSave = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSave)
+            val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
+
+            // 시간 필드에 클릭 리스너 추가
+            etTime.setOnClickListener {
+                showTimePickerDialog { startTime, endTime ->
+                    // 선택된 시간을 텍스트 필드에 표시
+                    etTime.setText("$startTime ~ $endTime")
+                }
+            }
 
             // 선택된 날짜 범위를 가져와서 시작일과 종료일 필드에 설정
             val (startDate, endDate) = getSelectedDateRange()
@@ -116,83 +125,94 @@ class ScheduleFragment : Fragment() {
                 etEndDate.setText(dateFormat.format(finalEndDate))
             }
 
-            AlertDialog.Builder(requireContext())
+            // AlertDialog 객체 생성 (버튼은 추가하지 않음)
+            val dialog = AlertDialog.Builder(requireContext())
                 .setTitle("일정 추가")
                 .setView(dialogView)
-                .setPositiveButton("추가") { _, _ ->
-                    val title = etTitle.text.toString()
-                    val startDateStr = etStartDate.text.toString()
-                    val endDateStr = etEndDate.text.toString()
-                    val timeStr = etTime.text.toString()
-                    val content = etContent.text.toString()
+                .setCancelable(true)
+                .create()
 
-                    if (title.isBlank() || startDateStr.isBlank() || endDateStr.isBlank()) {
-                        Toast.makeText(requireContext(), "제목과 날짜를 입력하세요.", Toast.LENGTH_SHORT).show()
-                        return@setPositiveButton
-                    }
+            // 저장 버튼 클릭 리스너
+            btnSave.setOnClickListener {
+                val title = etTitle.text.toString()
+                val startDateStr = etStartDate.text.toString()
+                val endDateStr = etEndDate.text.toString()
+                val timeStr = etTime.text.toString()
+                val content = etContent.text.toString()
 
-                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                    val timeSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-
-                    val startDate: Date = try {
-                        if (timeStr.isNotBlank()) {
-                            // 시간이 있으면 시간 포함해서 파싱
-                            val startTime = if (timeStr.contains("~")) {
-                                timeStr.split("~")[0].trim()
-                            } else {
-                                timeStr
-                            }
-                            timeSdf.parse("$startDateStr $startTime") ?: sdf.parse(startDateStr) ?: Date()
-                        } else {
-                            sdf.parse(startDateStr) ?: Date()
-                        }
-                    } catch (e: Exception) {
-                        try {
-                            sdf.parse(startDateStr) ?: Date()
-                        } catch (e2: Exception) {
-                            Date()
-                        }
-                    }
-
-                    val endDate: Date = try {
-                        if (timeStr.isNotBlank()) {
-                            // 시간이 있으면 시간 포함해서 파싱
-                            val endTime = if (timeStr.contains("~")) {
-                                timeStr.split("~")[1].trim()
-                            } else {
-                                timeStr
-                            }
-                            timeSdf.parse("$endDateStr $endTime") ?: sdf.parse(endDateStr) ?: Date()
-                        } else {
-                            sdf.parse(endDateStr) ?: Date()
-                        }
-                    } catch (e: Exception) {
-                        try {
-                            sdf.parse(endDateStr) ?: Date()
-                        } catch (e2: Exception) {
-                            Date()
-                        }
-                    }
-
-                    val schedule = ScheduleData(
-                        scheduleId = -1,
-                        clubId = -1,
-                        title = title,
-                        description = content,
-                        startDate = startDate,
-                        endDate = endDate,
-                        allDay = false,
-                        createdBy = -1
-                    )
-                    scheduleList.add(schedule)
-                    // 인디케이터(점) 추가
-                    indicatorList.add(MyIndicator(CalendarDate(startDate), 0xFF2196F3.toInt()))
-                    binding.crunchyCalendarView.datesIndicators = indicatorList
-                    selectedDate?.let { filterSchedulesByDate(it) }
-                    Toast.makeText(requireContext(), "일정이 추가되었습니다.", Toast.LENGTH_SHORT).show()
+                if (title.isBlank() || startDateStr.isBlank() || endDateStr.isBlank()) {
+                    Toast.makeText(requireContext(), "제목과 날짜를 입력하세요.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
                 }
-                .setNegativeButton("취소", null)
-                .show()
+
+                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                val timeSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
+                val startDate: Date = try {
+                    if (timeStr.isNotBlank()) {
+                        // 시간이 있으면 시간 포함해서 파싱
+                        val startTime = if (timeStr.contains("~")) {
+                            timeStr.split("~")[0].trim()
+                        } else {
+                            timeStr
+                        }
+                        timeSdf.parse("$startDateStr $startTime") ?: sdf.parse(startDateStr) ?: Date()
+                    } else {
+                        sdf.parse(startDateStr) ?: Date()
+                    }
+                } catch (e: Exception) {
+                    try {
+                        sdf.parse(startDateStr) ?: Date()
+                    } catch (e2: Exception) {
+                        Date()
+                    }
+                }
+
+                val endDate: Date = try {
+                    if (timeStr.isNotBlank()) {
+                        // 시간이 있으면 시간 포함해서 파싱
+                        val endTime = if (timeStr.contains("~")) {
+                            timeStr.split("~")[1].trim()
+                        } else {
+                            timeStr
+                        }
+                        timeSdf.parse("$endDateStr $endTime") ?: sdf.parse(endDateStr) ?: Date()
+                    } else {
+                        sdf.parse(endDateStr) ?: Date()
+                    }
+                } catch (e: Exception) {
+                    try {
+                        sdf.parse(endDateStr) ?: Date()
+                    } catch (e2: Exception) {
+                        Date()
+                    }
+                }
+
+                val schedule = ScheduleData(
+                    scheduleId = -1,
+                    clubId = -1,
+                    title = title,
+                    description = content,
+                    startDate = startDate,
+                    endDate = endDate,
+                    allDay = false,
+                    createdBy = -1
+                )
+                scheduleList.add(schedule)
+                // 인디케이터(점) 추가
+                indicatorList.add(MyIndicator(CalendarDate(startDate), 0xFF2196F3.toInt()))
+                binding.crunchyCalendarView.datesIndicators = indicatorList
+                selectedDate?.let { filterSchedulesByDate(it) }
+                Toast.makeText(requireContext(), "일정이 추가되었습니다.", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+
+            // 취소 버튼 클릭 리스너
+            btnCancel.setOnClickListener {
+                dialog.dismiss()
+            }
+
+            dialog.show()
         }
     }
 
@@ -307,9 +327,17 @@ class ScheduleFragment : Fragment() {
     }
 
     private fun showTimePickerDialog(onTimeSelected: (String, String) -> Unit) {
-        val dialog = Dialog(requireContext())
+        // Dialog 대신 AlertDialog.Builder 사용
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_time_picker, null)
-        dialog.setContentView(dialogView)
+        val dialog = AlertDialog.Builder(requireContext(), R.style.TransparentDialog)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
+        
+        // 다이얼로그 배경 투명하게 설정
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+        }
 
         val tvTitle = dialogView.findViewById<TextView>(R.id.tvTitle)
         val tvDateRange = dialogView.findViewById<TextView>(R.id.tvDateRange)
@@ -458,7 +486,6 @@ class ScheduleFragment : Fragment() {
             }
         }
 
-
         // 새로고침 버튼 (현재 시간으로 리셋)
         tvRefresh.setOnClickListener {
             val now = Calendar.getInstance()
@@ -514,6 +541,27 @@ class ScheduleFragment : Fragment() {
                 if (selectedEndHour == 12) 0 else selectedEndHour
             } else {
                 if (selectedEndHour == 12) 12 else selectedEndHour + 12
+            }
+
+            // 시작 시간과 종료 시간을 분 단위로 변환하여 비교
+            val startTimeInMinutes = start24Hour * 60 + selectedStartMinute
+            val endTimeInMinutes = end24Hour * 60 + selectedEndMinute
+
+            // 시작 시간이 종료 시간보다 늦은 경우
+            if (startTimeInMinutes >= endTimeInMinutes) {
+                Toast.makeText(requireContext(), "종료 시간은 시작 시간보다 늦어야 합니다", Toast.LENGTH_SHORT).show()
+                
+                // 종료 시간 탭으로 전환하고 시작 시간보다 1시간 뒤로 자동 설정
+                isSelectingStartTime = false
+                
+                // 시작 시간에서 1시간 추가
+                val newEndHour = (start24Hour + 1) % 24
+                selectedEndAmPm = if (newEndHour < 12) 0 else 1
+                selectedEndHour = if (newEndHour % 12 == 0) 12 else newEndHour % 12
+                selectedEndMinute = selectedStartMinute
+                
+                updateTabUI()
+                return@setOnClickListener
             }
 
             val start24Format = String.format("%02d:%02d", start24Hour, selectedStartMinute)
