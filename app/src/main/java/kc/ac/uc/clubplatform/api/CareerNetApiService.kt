@@ -4,7 +4,7 @@ import retrofit2.Call
 import retrofit2.http.GET
 import retrofit2.http.Query
 
-interface SchoolApiService {
+interface CareerNetApiService {
     @GET("openapi/OpenAPI/getOpenApi")
     fun searchSchools(
         @Query("apiKey") apiKey: String,

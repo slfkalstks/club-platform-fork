@@ -9,10 +9,10 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import kc.ac.uc.clubplatform.databinding.FragmentHomeBinding
-import kc.ac.uc.clubplatform.BoardActivity
-import kc.ac.uc.clubplatform.NotificationActivity
-import kc.ac.uc.clubplatform.ProfileActivity
-import kc.ac.uc.clubplatform.SearchActivity
+import kc.ac.uc.clubplatform.activity.BoardActivity
+import kc.ac.uc.clubplatform.activity.NotificationActivity
+import kc.ac.uc.clubplatform.activity.ProfileActivity
+import kc.ac.uc.clubplatform.activity.SearchActivity
 import kc.ac.uc.clubplatform.adapters.NoticeAdapter
 import kc.ac.uc.clubplatform.adapters.TipAdapter
 import kc.ac.uc.clubplatform.models.Post

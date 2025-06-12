@@ -1,5 +1,5 @@
 // SearchActivity.kt
-package kc.ac.uc.clubplatform
+package kc.ac.uc.clubplatform.activity
 
 import android.content.Intent
 import android.os.Bundle

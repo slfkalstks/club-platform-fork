@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@drawable/dialog_rounded_background">
+
+    <!-- 헤더 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="20dp">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="시간 설정"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50"/>
+
+        <TextView
+            android:id="@+id/tvClose"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:text="✕"
+            android:textSize="18sp"
+            android:textColor="#7F8C8D"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackgroundBorderless"/>
+
+    </LinearLayout>
+
+    <!-- 날짜 범위 표시 -->
+    <TextView
+        android:id="@+id/tvDateRange"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="시간을 선택해주세요"
+        android:textSize="16sp"
+        android:textColor="#7F8C8D"
+        android:gravity="center"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- 탭 선택 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:id="@+id/tvStartTimeTab"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="시작 시간"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#FF6B35"
+            android:gravity="center"
+            android:padding="12dp"
+            android:background="@drawable/tab_selected_background"/>
+
+        <TextView
+            android:id="@+id/tvEndTimeTab"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="종료 시간"
+            android:textSize="16sp"
+            android:textColor="#95A5A6"
+            android:gravity="center"
+            android:padding="12dp"
+            android:background="@drawable/tab_unselected_background"/>
+
+    </LinearLayout>
+
+    <!-- 시간 선택 휠 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <!-- 오전/오후 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginEnd="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="오전/오후"
+                android:textSize="12sp"
+                android:textColor="#95A5A6"
+                android:layout_marginBottom="8dp"/>
+
+            <NumberPicker
+                android:id="@+id/npAmPm"
+                android:layout_width="80dp"
+                android:layout_height="120dp"/>
+
+        </LinearLayout>
+
+        <!-- 시간 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginEnd="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="시간"
+                android:textSize="12sp"
+                android:textColor="#95A5A6"
+                android:layout_marginBottom="8dp"/>
+
+            <NumberPicker
+                android:id="@+id/npHour"
+                android:layout_width="80dp"
+                android:layout_height="120dp"/>
+
+        </LinearLayout>
+
+        <!-- 분 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="분"
+                android:textSize="12sp"
+                android:textColor="#95A5A6"
+                android:layout_marginBottom="8dp"/>
+
+            <NumberPicker
+                android:id="@+id/npMinute"
+                android:layout_width="80dp"
+                android:layout_height="120dp"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 빠른 추가 버튼들 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAddHour"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="+1시간"
+            android:textSize="12sp"
+            android:layout_marginEnd="8dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAdd20Min"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="+20분"
+            android:textSize="12sp"
+            android:layout_marginEnd="8dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAdd10Min"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="+10분"
+            android:textSize="12sp"
+            android:layout_marginEnd="8dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+        <TextView
+            android:id="@+id/tvRefresh"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:text="↻"
+            android:textSize="20sp"
+            android:textColor="#7F8C8D"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackgroundBorderless"/>
+
+    </LinearLayout>
+
+    <!-- 확인 버튼 -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnConfirm"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="확인"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:backgroundTint="#FF6B35"
+        android:textColor="@android:color/white"/>
+
+</LinearLayout>

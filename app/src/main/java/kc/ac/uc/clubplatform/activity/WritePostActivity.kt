@@ -1,6 +1,5 @@
-package kc.ac.uc.clubplatform
+package kc.ac.uc.clubplatform.activity
 
-import android.app.Activity
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import kc.ac.uc.clubplatform.databinding.ActivityWritePostBinding
@@ -36,7 +35,7 @@ class WritePostActivity : AppCompatActivity() {
 
                 val resultIntent = intent
                 resultIntent.putExtra("new_post", newPost)
-                setResult(Activity.RESULT_OK, resultIntent)
+                setResult(RESULT_OK, resultIntent)
                 finish()
             } else {
                 // 제목 또는 내용을 입력하지 않은 경우 처리

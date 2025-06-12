@@ -20,7 +20,7 @@ import kc.ac.uc.clubplatform.adapters.SelectableChatAdapter
 import kc.ac.uc.clubplatform.adapters.UserAdapter
 import kc.ac.uc.clubplatform.models.ChatRoom
 import kc.ac.uc.clubplatform.models.User
-import kc.ac.uc.clubplatform.ChatRoomActivity
+import kc.ac.uc.clubplatform.activity.ChatRoomActivity
 
 class ChatFragment : Fragment() {
     private var _binding: FragmentChatBinding? = null
