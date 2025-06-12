@@ -1,14 +1,24 @@
 package kc.ac.uc.clubplatform
 
+import android.app.Application
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import kc.ac.uc.clubplatform.api.ApiClient
 import kc.ac.uc.clubplatform.fragments.ChatFragment
 import kc.ac.uc.clubplatform.fragments.HomeFragment
 import kc.ac.uc.clubplatform.fragments.ScheduleFragment
 import kc.ac.uc.clubplatform.fragments.BoardListFragment
 import kc.ac.uc.clubplatform.databinding.ActivityMainBinding
+
+class ClubPlatformApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        // ApiClient 초기화
+        ApiClient.init(applicationContext)
+    }
+}
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding

@@ -1,22 +1,79 @@
 // ProfileActivity.kt
 package kc.ac.uc.clubplatform.activity
 
+import android.app.Activity
+import android.app.Dialog
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Base64
 import android.util.Log
+import android.view.View
+import android.view.Window
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import kc.ac.uc.clubplatform.R
+
 import kc.ac.uc.clubplatform.api.ApiClient
-import kc.ac.uc.clubplatform.api.LogoutRequest
+import kc.ac.uc.clubplatform.api.CareerNetApiClient
+import kc.ac.uc.clubplatform.api.ChangePasswordRequest
+import kc.ac.uc.clubplatform.api.UpdateDepartmentRequest
+import kc.ac.uc.clubplatform.api.UpdateProfileImageBase64Request
+import kc.ac.uc.clubplatform.api.WithdrawRequest
 import kc.ac.uc.clubplatform.databinding.ActivityProfileBinding
+import kc.ac.uc.clubplatform.util.AuthenticatedUrlLoader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONException
+import java.io.ByteArrayOutputStream
 
 // 정보갱신 추가 필요
 class ProfileActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileBinding
+    private var encodedImage: String? = null
+    private var schoolCode: String? = null
+
+    // 갤러리에서 이미지 선택 결과를 처리하는 런처를 회원가입과 동일한 방식으로 변경
+    private val getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            try {
+                // 이미지를 화면에 표시
+                binding.ivProfileImage.setImageURI(uri)
+                
+                // 비트맵으로 변환하고 인코딩
+                val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                val resizedBitmap = resizeBitmap(bitmap, 500)
+                encodeImageToBase64(resizedBitmap)
+                
+                // 서버로 업로드
+                encodedImage?.let { base64Image ->
+                    uploadProfileImageBase64(base64Image)
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileActivity", "이미지 처리 오류", e)
+                showToast("이미지 처리 중 오류가 발생했습니다: ${e.message}")
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,6 +85,11 @@ class ProfileActivity : AppCompatActivity() {
         setupMenuItems()
     }
 
+    override fun onResume() {
+        super.onResume()
+        setupProfileInfo() // 항상 최신 정보로 갱신
+    }
+
     private fun setupHeader() {
         // 뒤로가기 버튼 설정
         binding.ivBack.setOnClickListener {
@@ -36,16 +98,117 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun setupProfileInfo() {
-        // 실제 앱에서는 사용자 정보를 DB나 Preferences에서 가져와야 함
-        // 여기서는 샘플 데이터 사용
-        binding.tvUserName.text = "홍길동"
-        binding.tvSchoolName.text = "서울대학교"
-        binding.tvMajor.text = "컴퓨터공학과"
-        binding.tvStudentId.text = "2020123456"
+        // SharedPreferences에서 사용자 정보 가져오기
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        val userName = sharedPreferences.getString("user_name", null)
+        val schoolName = sharedPreferences.getString("school_name", null)
+        val major = sharedPreferences.getString("major", null)
+        val studentId = sharedPreferences.getString("student_id", null)
+        val profileImageUrl = sharedPreferences.getString("profile_image_url", null)
+        val userId = sharedPreferences.getString("user_id", null)
+        
+        // 학교 코드 저장 (학과 설정에 사용)
+        schoolCode = sharedPreferences.getString("school_code", null)
+        
+        // 이메일 값을 가져와서 로그에 출력
+        val email = sharedPreferences.getString("email", null)
+        Log.d("ProfileActivity", "User email from SharedPreferences: $email")
+        Log.d("ProfileActivity", "User ID from SharedPreferences: $userId")
+        
+        binding.tvUserName.text = userName ?: "NULL"
+        binding.tvSchoolName.text = schoolName ?: "NULL"
+        binding.tvMajor.text = major ?: "NULL"
+        binding.tvStudentId.text = studentId ?: "NULL"
+        
+        // 아이디 칸에 이메일 표시 (이메일이 없으면 userId 사용, 둘 다 없으면 "NULL" 표시)
+        binding.tvUserId.text = when {
+            !email.isNullOrEmpty() -> email
+            !userId.isNullOrEmpty() -> "사용자 #$userId"
+            else -> "NULL"
+        }
+        
+        // 프로필 사진 표시 개선
+        loadProfileImage(profileImageUrl)
 
         // 프로필 관리 버튼 클릭 이벤트
         binding.btnManageProfile.setOnClickListener {
             showProfileManageDialog()
+        }
+    }
+
+    /**
+     * 프로필 이미지를 안전하게 로드하는 메서드
+     */
+    private fun loadProfileImage(profileImageUrl: String?) {
+        // 사용자 ID 가져오기
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        val userId = sharedPreferences.getString("user_id", null)
+        
+        if (userId != null) {
+            Log.d("ProfileActivity", "Loading profile image for user: $userId")
+            
+            try {
+                // ProfileImageUrlUtil을 사용하여 URL 생성
+                val imageUrl = ApiClient.getProfileImageUrl(userId)
+                Log.d("ProfileActivity", "Profile image URL: $imageUrl")
+                
+                // 인증 헤더가 포함된 URL 생성
+                val authenticatedUrl = AuthenticatedUrlLoader(this, imageUrl).getGlideUrl()
+                
+                // Glide를 사용하여 이미지 로드 - 메모리 및 디스크 캐시 설정 추가
+                Glide.with(applicationContext)
+                    .load(authenticatedUrl)
+                    .placeholder(R.drawable.ic_profile_placeholder)
+                    .error(R.drawable.ic_profile_placeholder)
+                    .circleCrop()
+                    .skipMemoryCache(false) // 메모리 캐시 사용
+                    .diskCacheStrategy(DiskCacheStrategy.ALL) // 디스크 캐시 전략
+                    .override(150, 150) // 이미지 크기 최적화
+                    .dontAnimate() // 애니메이션 비활성화로 성능 향상
+                    .listener(object : RequestListener<android.graphics.drawable.Drawable> {
+                        override fun onLoadFailed(
+                            e: GlideException?,
+                            model: Any?,
+                            target: Target<android.graphics.drawable.Drawable>?,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            Log.e("ProfileActivity", "Failed to load profile image from: $model", e)
+                            if (e != null) {
+                                for (t in e.rootCauses) {
+                                    Log.e("ProfileImageLoad", "Root cause: ", t)
+                                }
+                            }
+                            return false
+                        }
+
+                        override fun onResourceReady(
+                            resource: android.graphics.drawable.Drawable?,
+                            model: Any?,
+                            target: Target<android.graphics.drawable.Drawable>?,
+                            dataSource: DataSource?,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            Log.d("ProfileActivity", "Profile image loaded successfully")
+                            Log.d("ProfileActivity", "Image source: ${dataSource?.name}") // 캐시 여부 확인
+                            return false
+                        }
+                    })
+                    .into(binding.ivProfileImage)
+            } catch (e: Exception) {
+                Log.e("ProfileActivity", "Exception during image loading setup", e)
+                try {
+                    binding.ivProfileImage.setImageResource(R.drawable.ic_profile_placeholder)
+                } catch (e2: Exception) {
+                    Log.e("ProfileActivity", "Failed to set placeholder image", e2)
+                }
+            }
+        } else {
+            Log.d("ProfileActivity", "No user ID found, using default image")
+            try {
+                binding.ivProfileImage.setImageResource(R.drawable.ic_profile_placeholder)
+            } catch (e: Exception) {
+                Log.e("ProfileActivity", "Failed to set placeholder image", e)
+            }
         }
     }
 
@@ -79,17 +242,13 @@ class ProfileActivity : AppCompatActivity() {
             .setTitle("프로필 관리")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> showDepartmentSettingDialog()
+                    // 학과정보 변경 구현시 적용 예정
+//                    0 -> showDepartmentSettingDialog()
                     1 -> showProfileImageOptions()
                 }
             }
             .setNegativeButton("취소", null)
             .show()
-    }
-
-    private fun showDepartmentSettingDialog() {
-        // 학과 설정 화면으로 전환 (실제 구현에서는 별도의 액티비티나 다이얼로그로 구현)
-        Toast.makeText(this, "학과 설정 화면으로 이동합니다", Toast.LENGTH_SHORT).show()
     }
 
     private fun showProfileImageOptions() {
@@ -99,11 +258,11 @@ class ProfileActivity : AppCompatActivity() {
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> {
-                        // 갤러리에서 이미지 선택 (실제 구현에서는 Intent 사용)
-                        Toast.makeText(this, "갤러리에서 이미지를 선택해주세요", Toast.LENGTH_SHORT).show()
+                        // 갤러리에서 이미지 선택 (회원가입과 동일한 방식으로 변경)
+                        getContent.launch("image/*")
                     }
                     1 -> {
-                        // 프로필 이미지 삭제
+                        // 프로필 이미지 삭제 (추후 구현)
                         Toast.makeText(this, "프로필 사진이 삭제되었습니다", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -112,39 +271,258 @@ class ProfileActivity : AppCompatActivity() {
             .show()
     }
 
+    /**
+     * 비트맵 크기 조정 함수 (회원가입과 동일한 방식으로 통일)
+     */
+    private fun resizeBitmap(bitmap: Bitmap, maxSize: Int): Bitmap {
+        var width = bitmap.width
+        var height = bitmap.height
+
+        if (width <= maxSize && height <= maxSize) {
+            return bitmap
+        }
+
+        val bitmapRatio = width.toFloat() / height.toFloat()
+        if (bitmapRatio > 1) {
+            width = maxSize
+            height = (width / bitmapRatio).toInt()
+        } else {
+            height = maxSize
+            width = (height * bitmapRatio).toInt()
+        }
+
+        return Bitmap.createScaledBitmap(bitmap, width, height, true)
+    }
+
+    /**
+     * 비트맵을 Base64로 인코딩 (회원가입과 동일한 방식)
+     */
+    private fun encodeImageToBase64(bitmap: Bitmap) {
+        try {
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+            val byteArray = outputStream.toByteArray()
+            encodedImage = Base64.encodeToString(byteArray, Base64.NO_WRAP)
+            Log.d("ProfileActivity", "Image encoded, length: ${encodedImage?.length ?: 0}")
+        } catch (e: Exception) {
+            Log.e("ProfileActivity", "인코딩 오류", e)
+            showToast("이미지 변환 중 오류가 발생했습니다")
+            encodedImage = null
+        }
+    }
+    
+    /**
+     * Base64 이미지를 서버로 업로드
+     */
+    private fun uploadProfileImageBase64(base64Image: String) {
+        // SharedPreferences에서 userId 가져오기
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        val userId = sharedPreferences.getString("user_id", null)
+        
+        if (userId == null) {
+            showToast("사용자 정보를 찾을 수 없습니다")
+            return
+        }
+        
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+                
+                // 요청 로깅 추가 (디버깅 목적)
+                Log.d("ProfileActivity", "Uploading profile image for user: $userId")
+                Log.d("ProfileActivity", "Base64 image length: ${base64Image.length}")
+                
+                // API 요청 데이터 생성
+                val request = UpdateProfileImageBase64Request(userId, base64Image)
+                
+                // API 호출
+                val response = ApiClient.apiService.updateProfileImageBase64(request)
+                
+                if (response.isSuccessful && response.body()?.get("success") == true) {
+                    showToast("프로필 사진이 성공적으로 변경되었습니다")
+                    
+                    // 프로필 이미지 리로드 (Glide 캐시 초기화)
+                    Glide.get(applicationContext).clearMemory() // 메인 스레드에서 메모리 캐시 삭제
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        Glide.get(applicationContext).clearDiskCache() // 디스크 캐시 삭제 (백그라운드 스레드에서 실행)
+                    }
+                    
+                    // 약간의 지연 후 이미지 리로드
+                    delay(300)
+                    withContext(Dispatchers.Main) {
+                        loadProfileImage(null)
+                    }
+                } else {
+                    // 오류 응답 상세 로깅
+                    val errorMessage = response.body()?.get("message")?.toString() ?: 
+                                      "프로필 사진 변경에 실패했습니다 (${response.code()})"
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("ProfileActivity", "Profile image update failed: $errorMessage")
+                    Log.e("ProfileActivity", "Error response body: $errorBody")
+                    showToast(errorMessage)
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileActivity", "Profile image update exception", e)
+                showToast("프로필 사진 변경 중 오류가 발생했습니다: ${e.message}")
+            } finally {
+                showLoading(false)
+            }
+        }
+    }
+
     private fun showPasswordChangeDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_change_password, null)
-
-        AlertDialog.Builder(this)
+        
+        // 다이얼로그 내부의 뷰 요소 가져오기
+        val etCurrentPassword = dialogView.findViewById<EditText>(R.id.etCurrentPassword)
+        val etNewPassword = dialogView.findViewById<EditText>(R.id.etNewPassword)
+        val etConfirmPassword = dialogView.findViewById<EditText>(R.id.etConfirmPassword)
+        
+        val dialog = AlertDialog.Builder(this)
             .setTitle("비밀번호 변경")
             .setView(dialogView)
-            .setPositiveButton("변경") { _, _ ->
-                // 비밀번호 변경 로직 (실제 구현에서는 입력값 검증 및 API 호출 필요)
-                Toast.makeText(this, "비밀번호가 변경되었습니다", Toast.LENGTH_SHORT).show()
-            }
+            .setPositiveButton("변경", null) // 버튼만 정의하고 리스너는 나중에 설정
             .setNegativeButton("취소", null)
-            .show()
+            .create()
+        
+        dialog.show()
+        
+        // 직접 버튼을 가져와서 커스텀 리스너 설정 (다이얼로그 자동 종료 방지)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            // 입력값 가져오기
+            val currentPassword = etCurrentPassword.text.toString().trim()
+            val newPassword = etNewPassword.text.toString().trim()
+            val confirmPassword = etConfirmPassword.text.toString().trim()
+            
+            // 입력값 검증
+            when {
+                currentPassword.isEmpty() -> {
+                    etCurrentPassword.error = "현재 비밀번호를 입력해주세요"
+                }
+                newPassword.isEmpty() -> {
+                    etNewPassword.error = "새 비밀번호를 입력해주세요"
+                }
+                newPassword.length < 8 -> {
+                    etNewPassword.error = "비밀번호는 8자 이상이어야 합니다"
+                }
+                confirmPassword.isEmpty() -> {
+                    etConfirmPassword.error = "비밀번호 확인을 입력해주세요"
+                }
+                newPassword != confirmPassword -> {
+                    etConfirmPassword.error = "비밀번호가 일치하지 않습니다"
+                }
+                else -> {
+                    // 모든 검증 통과 시 비밀번호 변경 처리
+                    changePassword(currentPassword, newPassword, confirmPassword, dialog)
+                }
+            }
+        }
+    }
+
+    private fun changePassword(currentPassword: String, newPassword: String, confirmPassword: String, dialog: AlertDialog) {
+        // SharedPreferences에서 userId 가져오기
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        val userId = sharedPreferences.getString("user_id", null)
+        
+        if (userId == null) {
+            showToast("사용자 정보를 찾을 수 없습니다")
+            return
+        }
+        
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+                
+                val request = ChangePasswordRequest(userId, currentPassword, newPassword, confirmPassword)
+                val response = ApiClient.apiService.changePassword(request)
+                
+                if (response.isSuccessful && response.body()?.success == true) {
+                    showToast("비밀번호가 성공적으로 변경되었습니다")
+                    dialog.dismiss() // 성공 시 다이얼로그 닫기
+                } else {
+                    // 실패 시 오류 메시지 표시
+                    val errorMessage = response.body()?.message ?: 
+                                      "비밀번호 변경에 실패했습니다 (${response.code()})"
+                    showToast(errorMessage)
+                    
+                    Log.e("ProfileActivity", "Password change failed: $errorMessage")
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileActivity", "Password change exception", e)
+                showToast("비밀번호 변경 중 오류가 발생했습니다: ${e.message}")
+            } finally {
+                showLoading(false)
+            }
+        }
     }
 
     private fun showWithdrawDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_withdraw, null)
-
-        AlertDialog.Builder(this)
+        
+        // 다이얼로그 내부의 비밀번호 입력 필드 가져오기
+        val etPassword = dialogView.findViewById<EditText>(R.id.etPassword)
+        
+        val dialog = AlertDialog.Builder(this)
             .setTitle("회원 탈퇴")
             .setMessage("정말로 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다.")
             .setView(dialogView)
-            .setPositiveButton("탈퇴") { _, _ ->
-                // 회원 탈퇴 로직 (실제 구현에서는 비밀번호 확인 및 API 호출 필요)
-                Toast.makeText(this, "회원 탈퇴가 완료되었습니다", Toast.LENGTH_SHORT).show()
-
-                // 로그인 화면으로 이동
-                val intent = Intent(this, LoginActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-                finish()
-            }
+            .setPositiveButton("탈퇴", null) // 버튼만 정의하고 리스너는 나중에 설정
             .setNegativeButton("취소", null)
-            .show()
+            .create()
+        
+        dialog.show()
+        
+        // 직접 버튼을 가져와서 커스텀 리스너 설정 (다이얼로그 자동 종료 방지)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val password = etPassword.text.toString().trim()
+            
+            if (password.isEmpty()) {
+                etPassword.error = "비밀번호를 입력해주세요"
+            } else {
+                // 비밀번호 입력 시 회원탈퇴 진행
+                withdrawAccount(password, dialog)
+            }
+        }
+    }
+
+    private fun withdrawAccount(password: String, dialog: AlertDialog) {
+        // SharedPreferences에서 userId 가져오기
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        val userId = sharedPreferences.getString("user_id", null)
+        
+        if (userId == null) {
+            showToast("사용자 정보를 찾을 수 없습니다")
+            return
+        }
+        
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+                
+                val request = WithdrawRequest(userId, password)
+                val response = ApiClient.apiService.withdrawAccount(request)
+                
+                if (response.isSuccessful && response.body()?.success == true) {
+                    showToast("회원 탈퇴가 완료되었습니다")
+                    dialog.dismiss() // 성공 시 다이얼로그 닫기
+                    
+                    // 로컬 데이터 삭제 및 로그인 화면으로 이동
+                    clearUserDataAndNavigateToLogin()
+                } else {
+                    // 실패 시 오류 메시지 표시
+                    val errorMessage = response.body()?.message ?: 
+                                      "회원 탈퇴에 실패했습니다 (${response.code()})"
+                    showToast(errorMessage)
+                    
+                    Log.e("ProfileActivity", "Account withdrawal failed: $errorMessage")
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileActivity", "Account withdrawal exception", e)
+                showToast("회원 탈퇴 중 오류가 발생했습니다: ${e.message}")
+            } finally {
+                showLoading(false)
+            }
+        }
     }
 
     private fun performLogout() {
@@ -168,31 +546,30 @@ class ProfileActivity : AppCompatActivity() {
             try {
                 showLoading(true)
 
-                val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
-                val refreshToken = sharedPreferences.getString("refresh_token", "") ?: ""
-                val logoutRequest = LogoutRequest(refreshToken)
-                val response = ApiClient.apiService.logout(logoutRequest)
+                // refreshToken 사용하지 않음 - 백엔드 API가 본문을 기대하지 않음
+                Log.d("ProfileActivity", "Logging out...")
+                
+                // 백엔드 API와 일치하도록 파라미터 없이 호출
+                val response = ApiClient.apiService.logout()
 
                 if (response.isSuccessful && response.body()?.success == true) {
-                    // 로그인 정보 삭제
-                    sharedPreferences.edit().apply {
-                        clear()
-                        apply()
-                    }
-
-                    showToast("로그아웃 되었습니다")
-
-                    // 로그인 화면으로 이동
-                    val intent = Intent(this@ProfileActivity, LoginActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
+                    Log.d("ProfileActivity", "Logout successful")
+                    clearUserDataAndNavigateToLogin()
                 } else {
-                    showToast("로그아웃에 실패했습니다: ${response.body()?.message ?: "알 수 없는 오류"}")
-                    Log.d("ProfileActivity", "Logout failed: ${response.errorBody()?.string()}")
+                    // 오류 응답 상세 로깅 개선
+                    val errorBody = response.errorBody()?.string() ?: "No error body"
+                    val errorCode = response.code()
+                    Log.e("ProfileActivity", "Logout failed: HTTP $errorCode, Error: $errorBody")
+                    
+                    showToast("로그아웃에 실패했습니다: ${response.body()?.message ?: "서버 오류 ($errorCode)"}")
+                    // 서버 응답이 실패해도 로컬에서는 로그아웃 처리
+                    clearUserDataAndNavigateToLogin()
                 }
             } catch (e: Exception) {
+                Log.e("ProfileActivity", "Logout exception", e)
                 showToast("로그아웃 중 오류가 발생했습니다: ${e.message}")
+                // 예외 발생해도 로컬에서는 로그아웃 처리
+                clearUserDataAndNavigateToLogin()
             } finally {
                 showLoading(false)
             }
@@ -200,64 +577,29 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     /**
-     * 인증 토큰을 파기하는 함수
-     * SharedPreferences에서 토큰 및 사용자 정보 삭제
+     * 사용자 데이터를 지우고 로그인 화면으로 이동하는 통합 함수
      */
-    private fun clearAuthToken() {
-        // SharedPreferences에서 토큰 삭제
-        val sharedPreferences = getSharedPreferences("ClubPlatformPrefs", MODE_PRIVATE)
-        sharedPreferences.edit().apply {
-            remove("auth_token")  // 인증 토큰 삭제
-            remove("user_id")     // 사용자 ID 삭제
-            remove("user_email")  // 사용자 이메일 삭제
-            // 필요한 다른 사용자 관련 데이터도 여기서 삭제
-            apply()
-        }
-
-        // 서버에 로그아웃 API 호출
-        lifecycleScope.launch {
-            try {
-                // refreshToken 가져오기
-                val refreshToken = getRefreshTokenFromStorage()
-                // LogoutRequest 객체 생성
-                val logoutRequest = LogoutRequest(refreshToken)
-                // 파라미터와 함께 로그아웃 API 호출
-                val response = ApiClient.apiService.logout(logoutRequest)
-                
-                if (response.isSuccessful) {
-                    // 서버측 토큰 무효화 성공
-                    // 이미 UI에서는 처리되었으므로 추가 작업 필요 없음
-                } else {
-                    // 서버 응답이 실패했지만 로컬 토큰은 삭제됨
-                    // 로그에만 기록
-                    println("로그아웃 API 실패: ${response.code()}")
-                }
-            } catch (e: Exception) {
-                // 서버 통신 실패 시에도 로컬 토큰은 삭제됨
-                e.printStackTrace()
-            }
-        }
-    }
-
-    private fun clearUserData() {
-        val sharedPreferences = getSharedPreferences("ClubPlatformPrefs", MODE_PRIVATE)
+    private fun clearUserDataAndNavigateToLogin() {
+        // 올바른 SharedPreferences 키 사용하여 모든 데이터 삭제
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
         sharedPreferences.edit().clear().apply()
-    }
-
-    private fun navigateToLogin() {
-        val intent = Intent(this, LoginActivity::class.java)
+        
+        Log.d("ProfileActivity", "User data cleared, navigating to login")
+        
+        // 로그인 화면으로 이동
+        val intent = Intent(this@ProfileActivity, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
-    }
-
-    private fun getRefreshTokenFromStorage(): String {
-        val sharedPreferences = getSharedPreferences("ClubPlatformPrefs", MODE_PRIVATE)
-        return sharedPreferences.getString("refresh_token", "") ?: ""
+        
+        showToast("로그아웃 되었습니다")
     }
 
     private fun showLoading(isLoading: Boolean) {
-        // 로딩 UI 표시 로직 (예: ProgressBar 표시/숨김)
+        // 로딩 UI 표시 로직
+        binding.root.alpha = if (isLoading) 0.5f else 1.0f
+        binding.root.isEnabled = !isLoading
+        // 로딩 표시자가 있다면 표시/숨김 처리
     }
 
     private fun showToast(message: String) {
