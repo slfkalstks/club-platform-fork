@@ -13,7 +13,8 @@ import kc.ac.uc.clubplatform.api.ApiClient
 import kc.ac.uc.clubplatform.api.LogoutRequest
 import kc.ac.uc.clubplatform.databinding.ActivityProfileBinding
 import kotlinx.coroutines.launch
-//
+
+// 정보갱신 추가 필요
 class ProfileActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileBinding
 
