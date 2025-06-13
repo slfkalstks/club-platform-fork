@@ -38,6 +38,7 @@ import kc.ac.uc.clubplatform.api.UpdateDepartmentRequest
 import kc.ac.uc.clubplatform.api.UpdateProfileImageBase64Request
 import kc.ac.uc.clubplatform.api.WithdrawRequest
 import kc.ac.uc.clubplatform.databinding.ActivityProfileBinding
+import kc.ac.uc.clubplatform.models.Department
 import kc.ac.uc.clubplatform.util.AuthenticatedUrlLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -51,6 +52,7 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileBinding
     private var encodedImage: String? = null
     private var schoolCode: String? = null
+    private var selectedDepartment: Department? = null
 
     // 갤러리에서 이미지 선택 결과를 처리하는 런처를 회원가입과 동일한 방식으로 변경
     private val getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -242,8 +244,7 @@ class ProfileActivity : AppCompatActivity() {
             .setTitle("프로필 관리")
             .setItems(options) { _, which ->
                 when (which) {
-                    // 학과정보 변경 구현시 적용 예정
-//                    0 -> showDepartmentSettingDialog()
+                    0 -> showDepartmentSettingDialog() // 학과 설정
                     1 -> showProfileImageOptions()
                 }
             }
@@ -271,9 +272,230 @@ class ProfileActivity : AppCompatActivity() {
             .show()
     }
 
-    /**
-     * 비트맵 크기 조정 함수 (회원가입과 동일한 방식으로 통일)
-     */
+    // 회원가입과 동일한 학과 검색 다이얼로그 활용
+    private fun showDepartmentSettingDialog() {
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(R.layout.dialog_department_search)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            (resources.displayMetrics.heightPixels * 0.8).toInt()
+        )
+
+        val etSearchDepartment = dialog.findViewById<EditText>(R.id.etSearchDepartment)
+        val btnSearchDepartment = dialog.findViewById<Button>(R.id.btnSearchDepartment)
+        val rvDepartmentList = dialog.findViewById<RecyclerView>(R.id.rvDepartmentList)
+        val progressBar = dialog.findViewById<ProgressBar>(R.id.progressBar)
+        val tvTitle = dialog.findViewById<TextView>(R.id.tvSchoolName)
+        val btnCancel = dialog.findViewById<Button>(R.id.btnCancel)
+
+        tvTitle.text = "학과 검색"
+
+        val departmentAdapter = kc.ac.uc.clubplatform.adapters.DepartmentAdapter { department ->
+            // 학과 선택 시 처리
+            selectedDepartment = department
+            binding.tvMajor.text = department.majorName
+
+            // 서버에 학과 정보 변경 요청
+            updateDepartmentOnServer(department)
+
+            // SharedPreferences에 저장
+            val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+            sharedPreferences.edit()
+                .putString("major", department.majorName)
+                .putString("department", department.facultyName)
+                .apply()
+
+            Toast.makeText(this, "학과가 변경되었습니다.", Toast.LENGTH_SHORT).show()
+            dialog.dismiss()
+        }
+
+        rvDepartmentList.apply {
+            layoutManager = LinearLayoutManager(this@ProfileActivity)
+            adapter = departmentAdapter
+            setHasFixedSize(true)
+        }
+
+        btnSearchDepartment.setOnClickListener {
+            val majorName = etSearchDepartment.text.toString().trim()
+            if (majorName.isEmpty()) {
+                Toast.makeText(this, "검색할 학과명을 입력하세요", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            progressBar.visibility = View.VISIBLE
+            searchMajorsByName(majorName, progressBar, departmentAdapter)
+        }
+
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        // 초기에 전체 학과 목록 로드
+        progressBar.visibility = View.VISIBLE
+        loadAllMajors(progressBar, departmentAdapter)
+
+        dialog.show()
+    }
+
+    // 서버에 학과 정보 변경 요청
+    private fun updateDepartmentOnServer(department: Department) {
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        val userId = sharedPreferences.getString("user_id", null) ?: return
+
+        val request = kc.ac.uc.clubplatform.api.UpdateDepartmentRequest(
+            userId = userId,
+            department = department.facultyName,
+            major = department.majorName
+        )
+
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+                val response = kc.ac.uc.clubplatform.api.ApiClient.apiService.updateDepartment(request)
+                val body = response.body()
+                // 응답이 Map 또는 JSONObject일 수 있으므로 안전하게 처리
+                val isSuccess = when (body) {
+                    is Map<*, *> -> body["success"] == true
+                    is org.json.JSONObject -> body.optBoolean("success", false)
+                    else -> false
+                }
+                val message = when (body) {
+                    is Map<*, *> -> body["message"]?.toString() ?: ""
+                    is org.json.JSONObject -> body.optString("message", "")
+                    else -> ""
+                }
+                if (response.isSuccessful && isSuccess) {
+                    showToast("학과 정보가 서버에 성공적으로 변경되었습니다.")
+                } else {
+                    showToast("서버에 학과 정보 변경 실패: $message")
+                }
+            } catch (e: Exception) {
+                showToast("서버 통신 오류: ${e.message}")
+            } finally {
+                showLoading(false)
+            }
+        }
+    }
+
+    // 회원가입과 동일한 방식의 학과 검색 함수
+    private fun searchMajorsByName(
+        majorName: String,
+        progressBar: ProgressBar,
+        adapter: kc.ac.uc.clubplatform.adapters.DepartmentAdapter
+    ) {
+        lifecycleScope.launch {
+            try {
+                progressBar.visibility = View.VISIBLE
+                var allDepartments = mutableListOf<Department>()
+                var currentPage = 1
+                val perPage = 100
+                var hasMoreResults = true
+                while (hasMoreResults && currentPage <= 3) {
+                    val result = kc.ac.uc.clubplatform.api.CareerNetApiClient.searchMajorByName(majorName, currentPage, perPage)
+                    val departments = parseDepartmentsFromJsonResponse(result)
+                    if (departments.isEmpty()) {
+                        hasMoreResults = false
+                    } else {
+                        allDepartments.addAll(departments)
+                        currentPage++
+                    }
+                }
+                val filteredDepartments = allDepartments.filter {
+                    it.majorName.contains(majorName, ignoreCase = true) ||
+                    it.facultyName.contains(majorName, ignoreCase = true)
+                }
+                val sortedDepartments = filteredDepartments.sortedWith(compareBy(
+                    { !it.majorName.startsWith(majorName, ignoreCase = true) },
+                    { !it.majorName.contains(majorName, ignoreCase = true) },
+                    { !it.facultyName.contains(majorName, ignoreCase = true) },
+                    { it.majorName }
+                ))
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    if (sortedDepartments.isEmpty()) {
+                        Toast.makeText(
+                            this@ProfileActivity,
+                            "검색 결과가 없습니다",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        adapter.updateDepartments(sortedDepartments)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    Toast.makeText(
+                        this@ProfileActivity,
+                        "학과 검색 실패: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    // 회원가입과 동일한 방식의 전체 학과 목록 로드 함수
+    private fun loadAllMajors(
+        progressBar: ProgressBar,
+        adapter: kc.ac.uc.clubplatform.adapters.DepartmentAdapter
+    ) {
+        lifecycleScope.launch {
+            try {
+                val result = kc.ac.uc.clubplatform.api.CareerNetApiClient.getAllMajors()
+                val departments = parseDepartmentsFromJsonResponse(result)
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    if (departments.isEmpty()) {
+                        Toast.makeText(
+                            this@ProfileActivity,
+                            "학과 정보를 불러올 수 없습니다",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        adapter.updateDepartments(departments)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    Toast.makeText(
+                        this@ProfileActivity,
+                        "학과 정보 로드 실패: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    // 회원가입과 동일한 방식의 학과 파싱 함수
+    private fun parseDepartmentsFromJsonResponse(jsonResponse: org.json.JSONObject): List<Department> {
+        val departments = mutableListOf<Department>()
+        try {
+            if (!jsonResponse.has("dataSearch")) return departments
+            val dataSearch = jsonResponse.getJSONObject("dataSearch")
+            if (!dataSearch.has("content")) return departments
+            val content = dataSearch.optJSONArray("content") ?: return departments
+            for (i in 0 until content.length()) {
+                val depJson = content.getJSONObject(i)
+                val majorName = depJson.optString("mClass", "")
+                val majorSeq = depJson.optString("majorSeq", "")
+                val lClass = depJson.optString("lClass", "")
+                if (majorName.isNotEmpty()) {
+                    departments.add(
+                        Department(
+                            majorName = majorName,
+                            majorSeq = majorSeq,
+                            facultyName = lClass
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {}
+        return departments
+    }
+
     private fun resizeBitmap(bitmap: Bitmap, maxSize: Int): Bitmap {
         var width = bitmap.width
         var height = bitmap.height
