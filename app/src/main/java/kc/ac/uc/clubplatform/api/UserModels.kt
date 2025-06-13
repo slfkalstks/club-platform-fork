@@ -49,3 +49,41 @@ data class User(
     val studentId: String,
     val profileImage: String?
 )
+
+// 비밀번호 변경 요청 모델
+data class ChangePasswordRequest(
+    val userId: String,
+    val currentPassword: String,
+    val newPassword: String,
+    val confirmPassword: String
+)
+
+// 회원탈퇴 요청 모델
+data class WithdrawRequest(
+    val userId: String,
+    val password: String
+)
+
+// 공통 API 응답 포맷
+data class ApiResponse(
+    val success: Boolean,
+    val message: String?
+)
+
+// Base64 이미지 업로드 요청 데이터 클래스
+data class UpdateProfileImageBase64Request(
+    val userId: String,
+    val base64Image: String
+)
+
+// 학과정보 변경 요청 데이터 클래스
+data class UpdateDepartmentRequest(
+    val userId: String,
+    val department: String,
+    val major: String
+)
+
+// RefreshToken 요청 데이터 클래스
+data class RefreshTokenRequest(
+    val refreshToken: String
+)
