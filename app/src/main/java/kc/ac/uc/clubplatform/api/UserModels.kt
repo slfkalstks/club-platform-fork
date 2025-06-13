@@ -19,7 +19,8 @@ data class RegisterResponse(
 
 data class LoginRequest(
     val email: String,
-    val password: String
+    val password: String,
+    val loginTime: Long? = null // 로그인 시간(ms) 추가
 )
 
 data class LoginResponse(

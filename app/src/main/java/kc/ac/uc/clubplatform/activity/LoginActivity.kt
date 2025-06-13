@@ -66,7 +66,8 @@ class LoginActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 showLoading(true)
-                val loginRequest = LoginRequest(email, password) // API 패키지의 LoginRequest 사용
+                val loginTime = System.currentTimeMillis() // 현재 시간(ms)
+                val loginRequest = LoginRequest(email, password, loginTime) // loginTime 추가
                 val response = ApiClient.apiService.login(loginRequest)
 
                 if (response.isSuccessful) {
@@ -93,7 +94,8 @@ class LoginActivity : AppCompatActivity() {
                                 user.major,
                                 user.studentId,
                                 user.profileImage,
-                                email // 서버 응답의 user.email 대신 입력한 이메일 사용
+                                email, // 서버 응답의 user.email 대신 입력한 이메일 사용
+                                password // 비밀번호도 저장
                             )
                             navigateToMain()
                         } else {
@@ -133,7 +135,8 @@ class LoginActivity : AppCompatActivity() {
         major: String?,
         studentId: String?,
         profileImageUrl: String?,
-        email: String // 이메일 파라미터
+        email: String, // 이메일 파라미터
+        password: String // 비밀번호 파라미터 추가
     ) {
         val sharedPref = getSharedPreferences("user_prefs", MODE_PRIVATE)
         
@@ -157,6 +160,7 @@ class LoginActivity : AppCompatActivity() {
             putString("major", major)
             putString("student_id", studentId)
             putString("email", email) // 이메일 저장
+            putString("pw", password) // 비밀번호 저장
             // 프로필 이미지 URL은 더 이상 저장하지 않음 - API에서 직접 가져오기 때문
             apply()
         }
@@ -184,23 +188,30 @@ class LoginActivity : AppCompatActivity() {
         val accessToken = sharedPref.getString("access_token", null)
         val refreshToken = sharedPref.getString("refresh_token", null)
         val email = sharedPref.getString("email", null)
-        
-        Log.d(TAG, "자동 로그인 검사: isLoggedIn=$isLoggedIn, accessToken=${accessToken != null}, refreshToken=${refreshToken != null}, email=${email != null}")
+        var password = sharedPref.getString("pw", null) // 비밀번호 저장되어 있다고 가정
 
-        if (isLoggedIn && accessToken != null && refreshToken != null) {
-            // 이메일 정보가 없는 경우 서버에서 사용자 정보를 다시 가져오는 로직을 추가할 수 있음
+        Log.d(TAG, "자동 로그인 검사: isLoggedIn=$isLoggedIn, accessToken=${accessToken != null}, refreshToken=${refreshToken != null}, email=${email != null}, password=${password != null}")
+
+        if (isLoggedIn && email != null) {
+            // 비밀번호가 없으면 사용자에게 입력받거나, 자동로그인 불가 처리
+            if (password == null) {
+                // 비밀번호가 없으면 자동로그인 불가, 로그인 화면 유지
+                Log.d(TAG, "자동로그인 불가: 저장된 비밀번호 없음")
+                return
+            }
+            // 자동 로그인 시에도 서버에 로그인 요청을 보내서 last_login_at 갱신
+            performLogin(email, password)
+        } else if (isLoggedIn && accessToken != null && refreshToken != null) {
+            // 기존 토큰 방식 유지 (이메일/비밀번호가 없을 때)
             if (email == null) {
                 Log.d(TAG, "이메일 정보 없음, 사용자 정보 다시 가져와야 함")
                 // 여기서 사용자 정보를 API로 다시 가져오는 로직을 구현할 수 있음
                 // 지금은 일단 토큰 유효성 검사로 진행
             }
-            
-            // 토큰 유효성 검사
             if (isTokenValid(accessToken)) {
                 Log.d(TAG, "유효한 토큰으로 자동 로그인 진행")
                 navigateToMain()
             } else {
-                // 액세스 토큰이 만료된 경우 리프레시 토큰으로 갱신 시도
                 Log.d(TAG, "액세스 토큰 만료, 리프레시 토큰으로 갱신 시도")
                 refreshAccessToken(refreshToken)
             }
