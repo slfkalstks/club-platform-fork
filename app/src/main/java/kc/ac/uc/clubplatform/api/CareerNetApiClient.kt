@@ -1,5 +1,6 @@
 package kc.ac.uc.clubplatform.api
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -44,9 +45,25 @@ object CareerNetApiClient {
         return getJsonByOkHttp(url)
     }
 
-    //학과 정보 조회
+    // 학과 정보 조회 (학과명으로 검색) - searchTitle 파라미터 사용으로 수정
+    suspend fun searchMajorByName(majorName: String, page: Int = 1, perPage: Int = 100): JSONObject {
+        val encodedName = URLEncoder.encode(majorName, StandardCharsets.UTF_8.toString())
+        val url = "$OPENAPI_URL?apiKey=$API_KEY&svcType=api&svcCode=MAJOR&contentType=json&gubun=univ_list&thisPage=$page&perPage=$perPage&searchTitle=$encodedName"
+        Log.d("CareerNetApiClient", "Searching major by name: $majorName, page: $page, perPage: $perPage")
+        return getJsonByOkHttp(url)
+    }
+
+    // 학과 정보 전체 목록 조회
+    suspend fun getAllMajors(page: Int = 1, perPage: Int = 100): JSONObject {
+        val url = "$OPENAPI_URL?apiKey=$API_KEY&svcType=api&svcCode=MAJOR&contentType=json&gubun=univ_list&thisPage=$page&perPage=$perPage"
+        Log.d("CareerNetApiClient", "Getting all majors, page: $page, perPage: $perPage")
+        return getJsonByOkHttp(url)
+    }
+
+    //학과 정보 조회 (학교코드 기준)
     suspend fun getDepartmentInfo(schoolCode: String): JSONObject {
         val url = "$OPENAPI_URL?apiKey=$API_KEY&svcType=api&svcCode=MAJOR&contentType=json&gubun=univ_list&thisPage=1&perPage=100&schoolCode=$schoolCode"
+        Log.d("CareerNetApiClient", "Getting department info with URL: $url")
         return getJsonByOkHttp(url)
     }
 
@@ -58,10 +75,27 @@ object CareerNetApiClient {
 
     private suspend fun getJsonByOkHttp(url: String): JSONObject {
         return withContext(Dispatchers.IO) {
-            val request = Request.Builder().url(url).get().build()
-            val response = okHttpClient.newCall(request).execute()
-            val responseBody = response.body?.string() ?: throw Exception("응답이 없습니다")
-            JSONObject(responseBody)
+            try {
+                val request = Request.Builder().url(url).get().build()
+                Log.d("CareerNetApiClient", "Sending request to: ${url.replace(API_KEY, "API_KEY_HIDDEN")}")
+                
+                val response = okHttpClient.newCall(request).execute()
+                val responseBody = response.body?.string()
+                
+                if (response.isSuccessful && !responseBody.isNullOrEmpty()) {
+                    Log.d("CareerNetApiClient", "Response received, status: ${response.code}")
+                    JSONObject(responseBody)
+                } else {
+                    Log.e("CareerNetApiClient", "API call failed, status: ${response.code}, message: ${response.message}")
+                    if (!responseBody.isNullOrEmpty()) {
+                        Log.e("CareerNetApiClient", "Response body: $responseBody")
+                    }
+                    throw Exception("API 호출 실패: ${response.code} ${response.message}")
+                }
+            } catch (e: Exception) {
+                Log.e("CareerNetApiClient", "Exception during API call", e)
+                throw Exception("API 요청 중 오류 발생: ${e.message}")
+            }
         }
     }
 }

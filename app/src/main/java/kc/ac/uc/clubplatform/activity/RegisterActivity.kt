@@ -6,12 +6,15 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.util.Patterns
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -19,14 +22,17 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kc.ac.uc.clubplatform.R
-import kc.ac.uc.clubplatform.adapters.SchoolAdapter
+import kc.ac.uc.clubplatform.adapters.DepartmentAdapter
+import kc.ac.uc.clubplatform.models.Department
 import kc.ac.uc.clubplatform.api.ApiClient
 import kc.ac.uc.clubplatform.api.CareerNetApiClient
 import kc.ac.uc.clubplatform.api.RegisterRequest
 import kc.ac.uc.clubplatform.api.RegisterResponse
 import kc.ac.uc.clubplatform.api.School
 import kc.ac.uc.clubplatform.databinding.ActivityRegisterBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONException
 import org.json.JSONObject
 import retrofit2.Call
@@ -40,6 +46,7 @@ class RegisterActivity : AppCompatActivity() {
     private var selectedSchool: School? = null
     private var profileImageUri: Uri? = null
     private var encodedImage: String? = null
+    private var selectedDepartment: Department? = null
 
     // 갤러리에서 이미지 선택 결과 처리
     private val getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -85,6 +92,22 @@ class RegisterActivity : AppCompatActivity() {
         binding.btnCancel.setOnClickListener {
             finish()
         }
+
+        // 학과 검색 설정
+        binding.etDepartment.setOnClickListener {
+            searchDepartment()
+        }
+        
+        // 학과 검색 버튼 설정
+        binding.btnSearchDepartment.setOnClickListener {
+            searchDepartment()
+        }
+    }
+    
+    private fun searchDepartment() {
+        Log.d("RegisterActivity", "searchDepartment called, selectedSchool: $selectedSchool")
+        // 전공 검색 다이얼로그를 직접 표시
+        showMajorSearchDialog()
     }
 
     private fun showSchoolSearchDialog() {
@@ -101,7 +124,7 @@ class RegisterActivity : AppCompatActivity() {
         val rvSchoolList = dialog.findViewById<RecyclerView>(R.id.rvSchoolList)
         val progressBar = dialog.findViewById<ProgressBar>(R.id.progressBar)
 
-        val schoolAdapter = SchoolAdapter { school ->
+        val schoolAdapter = kc.ac.uc.clubplatform.adapters.SchoolAdapter { school ->
             // 학교 선택 시 처리
             selectedSchool = school
             binding.etSchoolName.setText(school.schoolName)
@@ -136,7 +159,7 @@ class RegisterActivity : AppCompatActivity() {
     private fun searchUniversities(
         schoolName: String,
         progressBar: ProgressBar,
-        adapter: SchoolAdapter
+        adapter: kc.ac.uc.clubplatform.adapters.SchoolAdapter
     ) {
         lifecycleScope.launch {
             try {
@@ -175,19 +198,33 @@ class RegisterActivity : AppCompatActivity() {
 
             for (i in 0 until content.length()) {
                 val schoolJson = content.getJSONObject(i)
+                
+                // schoolCode 필드 로깅 추가
+                val schoolCode = schoolJson.optString("schoolCode")
+                Log.d("RegisterActivity", "School: ${schoolJson.optString("schoolName")}, Code: $schoolCode")
+                
+                // API 응답에서 schoolCode가 없거나 비어있을 수 있음 - "seq" 필드를 대체로 사용
+                val finalSchoolCode = if (schoolCode.isNullOrEmpty()) {
+                    val seq = schoolJson.optString("seq")
+                    Log.d("RegisterActivity", "Using seq as schoolCode: $seq")
+                    seq
+                } else {
+                    schoolCode
+                }
 
                 val school = School(
                     schoolName = schoolJson.optString("schoolName"),
                     schoolType = schoolJson.optString("schoolType"),
                     region = schoolJson.optString("region"),
-                    schoolCode = schoolJson.optString("schoolCode"),
+                    schoolCode = finalSchoolCode,  // 수정된 코드 사용
                     schoolAddr = schoolJson.optString("adres") ?: schoolJson.optString("schoolAddr"),
                     establishmentType = schoolJson.optString("estType")
                 )
-
+                
                 schools.add(school)
             }
         } catch (e: JSONException) {
+            Log.e("RegisterActivity", "Error parsing schools", e)
             e.printStackTrace()
         }
 
@@ -215,33 +252,270 @@ class RegisterActivity : AppCompatActivity() {
         }
     }
 
-    private data class Department(
-        val majorName: String,
-        val majorSeq: String
-    )
+    private fun showMajorSearchDialog() {
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(R.layout.dialog_department_search)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            (resources.displayMetrics.heightPixels * 0.8).toInt()
+        )
 
-    private fun parseDepartmentsFromJsonResponse(jsonResponse: JSONObject): List<Department> {
-        val departments = mutableListOf<Department>()
+        val etSearchDepartment = dialog.findViewById<EditText>(R.id.etSearchDepartment)
+        val btnSearchDepartment = dialog.findViewById<Button>(R.id.btnSearchDepartment)
+        val rvDepartmentList = dialog.findViewById<RecyclerView>(R.id.rvDepartmentList)
+        val progressBar = dialog.findViewById<ProgressBar>(R.id.progressBar)
+        val tvTitle = dialog.findViewById<TextView>(R.id.tvSchoolName)
+        val btnCancel = dialog.findViewById<Button>(R.id.btnCancel)
 
-        try {
-            val dataSearch = jsonResponse.getJSONObject("dataSearch")
-            val content = dataSearch.getJSONArray("content")
+        tvTitle.text = "학과 검색"
 
-            for (i in 0 until content.length()) {
-                val depJson = content.getJSONObject(i)
-
-                val department = Department(
-                    majorName = depJson.optString("majorName"),
-                    majorSeq = depJson.optString("majorSeq")
-                )
-
-                departments.add(department)
+        val departmentAdapter = DepartmentAdapter { department ->
+            // 학과 선택 시 처리
+            Log.d("RegisterActivity", "Selected department: ${department.majorName}, Faculty: ${department.facultyName}")
+            selectedDepartment = department
+            
+            // 학과명 설정
+            binding.etMajor.setText(department.majorName)
+            
+            // 학부 정보가 있는 경우 학부/단과대학 필드에 설정
+            if (department.facultyName.isNotEmpty()) {
+                binding.etDepartment.setText(department.facultyName)
+                
+                // 학부 정보를 메시지로 표시
+                Toast.makeText(this, "해당 학과의 학부: ${department.facultyName}", Toast.LENGTH_LONG).show()
             }
-        } catch (e: JSONException) {
-            e.printStackTrace()
+            
+            dialog.dismiss()
         }
 
-        return departments
+        rvDepartmentList.apply {
+            layoutManager = LinearLayoutManager(this@RegisterActivity)
+            adapter = departmentAdapter
+            setHasFixedSize(true)
+        }
+
+        btnSearchDepartment.setOnClickListener {
+            val majorName = etSearchDepartment.text.toString().trim()
+            if (majorName.isEmpty()) {
+                Toast.makeText(this, "검색할 학과명을 입력하세요", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            progressBar.visibility = View.VISIBLE
+            searchMajorsByName(majorName, progressBar, departmentAdapter)
+        }
+
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        // 초기에 모든 학과 목록 로드
+        progressBar.visibility = View.VISIBLE
+        loadAllMajors(progressBar, departmentAdapter)
+
+        dialog.show()
+    }
+
+    private fun searchMajorsByName(
+        majorName: String,
+        progressBar: ProgressBar,
+        adapter: DepartmentAdapter
+    ) {
+        lifecycleScope.launch {
+            try {
+                progressBar.visibility = View.VISIBLE
+                
+                // 여러 페이지의 결과를 가져오기 위한 변수
+                var allDepartments = mutableListOf<Department>()
+                var currentPage = 1
+                val perPage = 100
+                var hasMoreResults = true
+                
+                // 최대 3페이지(300개)까지 결과를 가져오도록 설정
+                while (hasMoreResults && currentPage <= 3) {
+                    val result = CareerNetApiClient.searchMajorByName(majorName, currentPage, perPage)
+                    Log.d("RegisterActivity", "Major search API response received for page $currentPage")
+                    
+                    val departments = parseDepartmentsFromJsonResponse(result)
+                    Log.d("RegisterActivity", "Parsed departments count for page $currentPage: ${departments.size}")
+                    
+                    if (departments.isEmpty()) {
+                        hasMoreResults = false
+                    } else {
+                        allDepartments.addAll(departments)
+                        currentPage++
+                    }
+                }
+                
+                // 클라이언트 측에서 검색어 필터링 추가
+                val filteredDepartments = allDepartments.filter { 
+                    it.majorName.contains(majorName, ignoreCase = true) || 
+                    it.facultyName.contains(majorName, ignoreCase = true) 
+                }
+                
+                // 정렬: 검색어와 정확히 일치하는 항목을 먼저 표시
+                val sortedDepartments = filteredDepartments.sortedWith(compareBy(
+                    // 1. 검색어로 시작하는 학과명을 최우선
+                    { !it.majorName.startsWith(majorName, ignoreCase = true) },
+                    // 2. 검색어가 포함된 학과명을 다음으로
+                    { !it.majorName.contains(majorName, ignoreCase = true) },
+                    // 3. 검색어가 포함된 학부명을 그 다음으로
+                    { !it.facultyName.contains(majorName, ignoreCase = true) },
+                    // 4. 학과명 알파벳 순
+                    { it.majorName }
+                ))
+                
+                Log.d("RegisterActivity", "Filtered and sorted departments count: ${sortedDepartments.size}")
+                
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+
+                    if (sortedDepartments.isEmpty()) {
+                        Toast.makeText(
+                            this@RegisterActivity,
+                            "검색 결과가 없습니다",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        // 검색 결과에 컴퓨터 관련 학과가 있는지 로그로 확인
+                        val computerDepts = sortedDepartments.filter { it.majorName.contains("컴퓨터") }
+                        if (computerDepts.isNotEmpty()) {
+                            Log.d("RegisterActivity", "컴퓨터 관련 학과 검색 결과: ${computerDepts.size}개")
+                            computerDepts.forEachIndexed { index, dept ->
+                                Log.d("RegisterActivity", "$index: ${dept.majorName}, ${dept.facultyName}")
+                            }
+                        }
+                        
+                        adapter.updateDepartments(sortedDepartments)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    Log.e("RegisterActivity", "Failed to search majors", e)
+                    Toast.makeText(
+                        this@RegisterActivity,
+                        "학과 검색 실패: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    private fun loadAllMajors(
+        progressBar: ProgressBar,
+        adapter: DepartmentAdapter
+    ) {
+        lifecycleScope.launch {
+            try {
+                val result = CareerNetApiClient.getAllMajors()
+                Log.d("RegisterActivity", "All majors API response received")
+                
+                val departments = parseDepartmentsFromJsonResponse(result)
+                Log.d("RegisterActivity", "Parsed departments count: ${departments.size}")
+
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+
+                    if (departments.isEmpty()) {
+                        Toast.makeText(
+                            this@RegisterActivity,
+                            "학과 정보를 불러올 수 없습니다",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        adapter.updateDepartments(departments)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    Log.e("RegisterActivity", "Failed to load all majors", e)
+                    Toast.makeText(
+                        this@RegisterActivity,
+                        "학과 정보 로드 실패: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    private fun showMajorInputDialog(department: Department) {
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(R.layout.dialog_major_input)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+
+        val tvDepartment = dialog.findViewById<TextView>(R.id.tvDepartment)
+        val etMajor = dialog.findViewById<EditText>(R.id.etMajor)
+        val btnConfirm = dialog.findViewById<Button>(R.id.btnConfirm)
+        val btnCancel = dialog.findViewById<Button>(R.id.btnCancel)
+
+        tvDepartment.text = department.majorName
+
+        btnConfirm.setOnClickListener {
+            val major = etMajor.text.toString().trim()
+            if (major.isNotEmpty()) {
+                binding.etMajor.setText(major)
+                dialog.dismiss()
+            } else {
+                Toast.makeText(this, "전공을 입력해주세요", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    private fun showDirectInputDialog() {
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(R.layout.dialog_department_input)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+
+        val etDepartment = dialog.findViewById<EditText>(R.id.etDepartment)
+        val etMajor = dialog.findViewById<EditText>(R.id.etMajor)
+        val btnConfirm = dialog.findViewById<Button>(R.id.btnConfirm)
+        val btnCancel = dialog.findViewById<Button>(R.id.btnCancel)
+
+        btnConfirm.setOnClickListener {
+            val department = etDepartment.text.toString().trim()
+            val major = etMajor.text.toString().trim()
+
+            if (department.isEmpty()) {
+                Toast.makeText(this, "학과를 입력해주세요", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (major.isEmpty()) {
+                Toast.makeText(this, "전공을 입력해주세요", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            binding.etDepartment.setText(department)
+            binding.etMajor.setText(major)
+            dialog.dismiss()
+        }
+
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun validateForm(): Boolean {
@@ -286,13 +560,6 @@ class RegisterActivity : AppCompatActivity() {
         // 학교 정보 검증
         if (selectedSchool == null) {
             Toast.makeText(this, "학교를 선택해주세요", Toast.LENGTH_SHORT).show()
-            return false
-        }
-
-        // 학과 검증
-        val department = binding.etDepartment.text.toString().trim()
-        if (department.isEmpty()) {
-            binding.etDepartment.error = "학과를 입력해주세요"
             return false
         }
 
@@ -352,7 +619,6 @@ class RegisterActivity : AppCompatActivity() {
         val email = binding.etEmail.text.toString().trim()
         val password = binding.etPassword.text.toString()
         val university = binding.etSchoolName.text.toString().trim()
-        val department = binding.etDepartment.text.toString().trim()
         val major = binding.etMajor.text.toString().trim()
         val studentId = binding.etStudentId.text.toString().trim()
 
@@ -361,8 +627,8 @@ class RegisterActivity : AppCompatActivity() {
             password = password,
             name = name,
             university = university,
-            department = department,
-            major = major,
+            department = major, // 전공 정보를 department 필드에 저장
+            major = major,      // 전공 정보를 major 필드에도 저장
             studentId = studentId,
             profileImage = encodedImage
         )
@@ -415,14 +681,69 @@ class RegisterActivity : AppCompatActivity() {
         finish()
     }
 
-    data class UserRegistrationData(
-        val email: String,
-        val password: String,
-        val name: String,
-        val university: String,
-        val department: String,
-        val major: String,
-        val studentId: String,
-        val profileImage: String?
-    )
+    private fun parseDepartmentsFromJsonResponse(jsonResponse: JSONObject): List<Department> {
+        val departments = mutableListOf<Department>()
+
+        try {
+            Log.d("RegisterActivity", "Parsing department response")
+            
+            if (!jsonResponse.has("dataSearch")) {
+                Log.e("RegisterActivity", "JSON response doesn't have dataSearch field")
+                Log.d("RegisterActivity", "Response structure: ${jsonResponse.keys().asSequence().toList()}")
+                return departments
+            }
+            
+            val dataSearch = jsonResponse.getJSONObject("dataSearch")
+            
+            if (!dataSearch.has("content")) {
+                Log.e("RegisterActivity", "dataSearch doesn't have content field")
+                Log.d("RegisterActivity", "dataSearch structure: ${dataSearch.keys().asSequence().toList()}")
+                return departments
+            }
+            
+            val content = dataSearch.optJSONArray("content") ?: run {
+                Log.e("RegisterActivity", "content is not a JSONArray")
+                return departments
+            }
+
+            Log.d("RegisterActivity", "Found ${content.length()} items in content array")
+
+            if (content.length() > 0) {
+                // 첫 번째 항목의 전체 구조를 로깅
+                val firstItem = content.getJSONObject(0)
+                Log.d("RegisterActivity", "First item structure: ${firstItem.keys().asSequence().toList()}")
+                
+                for (i in 0 until content.length()) {
+                    try {
+                        val depJson = content.getJSONObject(i)
+                        
+                        // API 응답에서 필드 추출
+                        val majorName = depJson.optString("mClass", "")
+                        val majorSeq = depJson.optString("majorSeq", "")
+                        val lClass = depJson.optString("lClass", "") // 대분류(학부)
+                        
+                        // 디버그 로그
+                        Log.d("RegisterActivity", "Department: $majorName, Faculty: $lClass, Seq: $majorSeq")
+                        
+                        if (majorName.isNotEmpty()) {
+                            departments.add(Department(
+                                majorName = majorName,
+                                majorSeq = majorSeq,
+                                facultyName = lClass
+                            ))
+                        }
+                    } catch (e: Exception) {
+                        Log.e("RegisterActivity", "Error parsing department at index $i", e)
+                    }
+                }
+            }
+            
+            Log.d("RegisterActivity", "Successfully parsed ${departments.size} departments")
+        } catch (e: JSONException) {
+            Log.e("RegisterActivity", "JSON parsing error", e)
+            e.printStackTrace()
+        }
+
+        return departments
+    }
 }
