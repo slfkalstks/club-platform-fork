@@ -18,6 +18,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -40,6 +41,8 @@ import retrofit2.Callback
 import retrofit2.Response
 import java.io.ByteArrayOutputStream
 import java.util.Base64
+import android.text.TextWatcher
+import android.text.Editable
 
 class RegisterActivity : AppCompatActivity() {
     private lateinit var binding: ActivityRegisterBinding
@@ -102,8 +105,99 @@ class RegisterActivity : AppCompatActivity() {
         binding.btnSearchDepartment.setOnClickListener {
             searchDepartment()
         }
+        
+        // 실시간 입력값 변경 시 테두리 색상 초기화
+        setupValidationListeners()
     }
-    
+
+    private fun setupValidationListeners() {
+        // 이메일 실시간 검증
+        binding.etEmail.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val email = s?.toString()?.trim() ?: ""
+                if (email.isEmpty() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    binding.etEmailLayout.error = "유효한 이메일 주소를 입력해주세요"
+                    setBoxStrokeError(binding.etEmailLayout)
+                } else {
+                    binding.etEmailLayout.error = null
+                    setBoxStrokeSuccess(binding.etEmailLayout)
+                }
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        // 비밀번호 실시간 검증
+        binding.etPassword.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val password = s?.toString() ?: ""
+                if (password.isEmpty() || password.length < 8) {
+                    binding.etPasswordLayout.error = "비밀번호는 최소 8자리 이상이어야 합니다"
+                    setBoxStrokeError(binding.etPasswordLayout)
+                } else {
+                    binding.etPasswordLayout.error = null
+                    setBoxStrokeSuccess(binding.etPasswordLayout)
+                }
+                // 비밀번호 확인도 같이 검증
+                validateConfirmPassword()
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        // 비밀번호 확인 실시간 검증
+        binding.etConfirmPassword.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                validateConfirmPassword()
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        // 학번 실시간 검증
+        binding.etStudentId.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val studentId = s?.toString()?.trim() ?: ""
+                val studentIdPattern = Regex("^\\d{8}$")
+                if (studentId.isEmpty() || !studentIdPattern.matches(studentId)) {
+                    binding.etStudentIdLayout.error = "학번(8자리 숫자)을 입력해주세요"
+                    setBoxStrokeError(binding.etStudentIdLayout)
+                } else {
+                    binding.etStudentIdLayout.error = null
+                    setBoxStrokeSuccess(binding.etStudentIdLayout)
+                }
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+    }
+
+    // 비밀번호 확인 실시간 검증 함수
+    private fun validateConfirmPassword() {
+        val password = binding.etPassword.text?.toString() ?: ""
+        val confirmPassword = binding.etConfirmPassword.text?.toString() ?: ""
+        if (confirmPassword.isEmpty() || confirmPassword != password) {
+            binding.etConfirmPasswordLayout.error = "비밀번호가 일치하지 않습니다"
+            setBoxStrokeError(binding.etConfirmPasswordLayout)
+        } else {
+            binding.etConfirmPasswordLayout.error = null
+            setBoxStrokeSuccess(binding.etConfirmPasswordLayout)
+        }
+    }
+
+    private fun resetBoxStroke(layout: com.google.android.material.textfield.TextInputLayout) {
+        // outline_default 색상이 없으므로 기본 회색(Color.GRAY) 사용
+        layout.boxStrokeColor = ContextCompat.getColor(this, android.R.color.darker_gray)
+    }
+
+    private fun setBoxStrokeError(layout: com.google.android.material.textfield.TextInputLayout) {
+        layout.boxStrokeColor = ContextCompat.getColor(this, android.R.color.holo_red_dark)
+    }
+
+    private fun setBoxStrokeSuccess(layout: com.google.android.material.textfield.TextInputLayout) {
+        layout.boxStrokeColor = ContextCompat.getColor(this, android.R.color.holo_green_dark)
+    }
+
     private fun searchDepartment() {
         Log.d("RegisterActivity", "searchDepartment called, selectedSchool: $selectedSchool")
         // 전공 검색 다이얼로그를 직접 표시
@@ -519,65 +613,74 @@ class RegisterActivity : AppCompatActivity() {
     }
 
     private fun validateForm(): Boolean {
+        var isValid = true
+
         // 이름 검증
         val name = binding.etName.text.toString().trim()
         if (name.isEmpty()) {
             binding.etName.error = "이름을 입력해주세요"
-            return false
+            isValid = false
         }
 
         // 이메일 검증
         val email = binding.etEmail.text.toString().trim()
-        if (email.isEmpty()) {
-            binding.etEmail.error = "이메일을 입력해주세요"
-            return false
-        }
-
-        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            binding.etEmail.error = "유효한 이메일 주소를 입력해주세요"
-            return false
+        if (email.isEmpty() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.etEmailLayout.error = "유효한 이메일 주소를 입력해주세요"
+            setBoxStrokeError(binding.etEmailLayout)
+            isValid = false
+        } else {
+            binding.etEmailLayout.error = null
+            setBoxStrokeSuccess(binding.etEmailLayout)
         }
 
         // 비밀번호 검증
         val password = binding.etPassword.text.toString()
-        if (password.isEmpty()) {
-            binding.etPassword.error = "비밀번호를 입력해주세요"
-            return false
-        }
-
-        if (password.length < 8) {
-            binding.etPassword.error = "비밀번호는 최소 8자리 이상이어야 합니다"
-            return false
+        if (password.isEmpty() || password.length < 8) {
+            binding.etPasswordLayout.error = "비밀번호는 최소 8자리 이상이어야 합니다"
+            setBoxStrokeError(binding.etPasswordLayout)
+            isValid = false
+        } else {
+            binding.etPasswordLayout.error = null
+            setBoxStrokeSuccess(binding.etPasswordLayout)
         }
 
         // 비밀번호 확인 검증
         val confirmPassword = binding.etConfirmPassword.text.toString()
-        if (confirmPassword != password) {
-            binding.etConfirmPassword.error = "비밀번호가 일치하지 않습니다"
-            return false
+        if (confirmPassword != password || confirmPassword.isEmpty()) {
+            binding.etConfirmPasswordLayout.error = "비밀번호가 일치하지 않습니다"
+            setBoxStrokeError(binding.etConfirmPasswordLayout)
+            isValid = false
+        } else {
+            binding.etConfirmPasswordLayout.error = null
+            setBoxStrokeSuccess(binding.etConfirmPasswordLayout)
         }
 
         // 학교 정보 검증
         if (selectedSchool == null) {
             Toast.makeText(this, "학교를 선택해주세요", Toast.LENGTH_SHORT).show()
-            return false
+            isValid = false
         }
 
         // 전공 검증
         val major = binding.etMajor.text.toString().trim()
         if (major.isEmpty()) {
             binding.etMajor.error = "전공을 입력해주세요"
-            return false
+            isValid = false
         }
 
-        // 학번 검증
+        // 학번 검증 (숫자 8자리 예시)
         val studentId = binding.etStudentId.text.toString().trim()
-        if (studentId.isEmpty()) {
-            binding.etStudentId.error = "학번을 입력해주세요"
-            return false
+        val studentIdPattern = Regex("^\\d{8}$")
+        if (studentId.isEmpty() || !studentIdPattern.matches(studentId)) {
+            binding.etStudentIdLayout.error = "학번(8자리 숫자)을 입력해주세요"
+            setBoxStrokeError(binding.etStudentIdLayout)
+            isValid = false
+        } else {
+            binding.etStudentIdLayout.error = null
+            setBoxStrokeSuccess(binding.etStudentIdLayout)
         }
 
-        return true
+        return isValid
     }
 
     private fun encodeImage(imageUri: Uri) {
