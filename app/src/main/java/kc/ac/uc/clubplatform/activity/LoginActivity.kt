@@ -170,9 +170,71 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun navigateToMain() {
-        val intent = Intent(this@LoginActivity, MainActivity::class.java)
-        startActivity(intent)
-        finish()
+        // 로그인 성공 후 동아리 가입 여부 확인
+        checkClubMembership()
+    }
+
+    private fun checkClubMembership() {
+        lifecycleScope.launch {
+            try {
+                val response = ApiClient.apiService.getMyClubs()
+
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val clubs = response.body()?.data ?: emptyList()
+
+                    if (clubs.isNotEmpty()) {
+                        // 기존 사용자: 저장된 현재 동아리 정보 확인
+                        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+                        val savedClubId = sharedPreferences.getInt("current_club_id", -1)
+                        val savedClubName = sharedPreferences.getString("current_club_name", "")
+
+                        // 저장된 동아리가 현재 가입된 동아리 목록에 있는지 확인
+                        val savedClub = clubs.find { it.clubId == savedClubId }
+
+                        if (savedClub != null && !savedClubName.isNullOrEmpty()) {
+                            // 저장된 동아리가 유효하면 그대로 사용 (기존 사용자)
+                            Log.d(TAG, "Using saved club: ${savedClub.name} (ID: ${savedClub.clubId})")
+                        } else {
+                            // 저장된 동아리가 없거나 유효하지 않으면 첫 번째 동아리 설정 (새 사용자 또는 동아리 탈퇴한 경우)
+                            val firstClub = clubs.first()
+                            saveCurrentClub(firstClub.clubId, firstClub.name)
+                            Log.d(TAG, "Setting first club as current: ${firstClub.name} (ID: ${firstClub.clubId})")
+                        }
+
+                        // 메인 화면으로 이동
+                        val intent = Intent(this@LoginActivity, MainActivity::class.java)
+                        startActivity(intent)
+                        finish()
+                    } else {
+                        // 가입된 동아리가 없으면 동아리 가입 화면으로 이동
+                        val intent = Intent(this@LoginActivity, ClubJoinActivity::class.java)
+                        startActivity(intent)
+                        finish()
+                    }
+                } else {
+                    // API 호출 실패 시 동아리 가입 화면으로 이동
+                    val intent = Intent(this@LoginActivity, ClubJoinActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to check club membership", e)
+                // 예외 발생 시 동아리 가입 화면으로 이동
+                val intent = Intent(this@LoginActivity, ClubJoinActivity::class.java)
+                startActivity(intent)
+                finish()
+            }
+        }
+    }
+
+    private fun saveCurrentClub(clubId: Int, clubName: String) {
+        val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+        sharedPreferences.edit()
+            .putInt("current_club_id", clubId)
+            .putString("current_club_name", clubName)
+            .apply()
+
+        Log.d(TAG, "Current club saved: $clubName (ID: $clubId)")
     }
 
     private fun showToast(message: String) {

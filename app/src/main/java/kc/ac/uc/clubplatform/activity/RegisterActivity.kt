@@ -158,9 +158,9 @@ class RegisterActivity : AppCompatActivity() {
         binding.etStudentId.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 val studentId = s?.toString()?.trim() ?: ""
-                val studentIdPattern = Regex("^\\d{8}$")
+                val studentIdPattern = Regex("^\\d{7}$")
                 if (studentId.isEmpty() || !studentIdPattern.matches(studentId)) {
-                    binding.etStudentIdLayout.error = "학번(8자리 숫자)을 입력해주세요"
+                    binding.etStudentIdLayout.error = "학번(7자리 숫자)을 입력해주세요"
                     setBoxStrokeError(binding.etStudentIdLayout)
                 } else {
                     binding.etStudentIdLayout.error = null
@@ -670,9 +670,9 @@ class RegisterActivity : AppCompatActivity() {
 
         // 학번 검증 (숫자 8자리 예시)
         val studentId = binding.etStudentId.text.toString().trim()
-        val studentIdPattern = Regex("^\\d{8}$")
+        val studentIdPattern = Regex("^\\d{7}$")
         if (studentId.isEmpty() || !studentIdPattern.matches(studentId)) {
-            binding.etStudentIdLayout.error = "학번(8자리 숫자)을 입력해주세요"
+            binding.etStudentIdLayout.error = "학번(7자리 숫자)을 입력해주세요"
             setBoxStrokeError(binding.etStudentIdLayout)
             isValid = false
         } else {

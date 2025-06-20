@@ -1,11 +1,16 @@
 package kc.ac.uc.clubplatform.api
 
+import kc.ac.uc.clubplatform.models.ClubJoinRequest
+import kc.ac.uc.clubplatform.models.ClubJoinResponse
+import kc.ac.uc.clubplatform.models.ClubListResponse
+import kc.ac.uc.clubplatform.models.MyClubsResponse
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("auth/login")
@@ -42,6 +47,16 @@ interface ApiService {
     // 학과정보 변경 API
     @POST("auth/update-department")
     suspend fun updateDepartment(@Body request: UpdateDepartmentRequest): Response<Map<String, Any>>
+
+    // 동아리 관련 API 추가
+    @GET("clubs/my")
+    suspend fun getMyClubs(): Response<MyClubsResponse>
+
+    @POST("clubs/join")
+    suspend fun joinClub(@Body request: ClubJoinRequest): Response<ClubJoinResponse>
+
+    @GET("clubs")
+    suspend fun getClubList(): Response<ClubListResponse>
 }
 
 
