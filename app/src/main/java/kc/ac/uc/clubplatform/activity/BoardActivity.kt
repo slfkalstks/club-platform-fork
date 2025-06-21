@@ -17,12 +17,17 @@ import kc.ac.uc.clubplatform.adapters.CommentAdapter
 import kc.ac.uc.clubplatform.api.ApiClient
 import kc.ac.uc.clubplatform.models.PostInfo
 import kc.ac.uc.clubplatform.models.PostDetail
-import kc.ac.uc.clubplatform.models.BoardInfo
 import kotlinx.coroutines.launch
 import io.noties.markwon.Markwon
 import android.util.Log
+import kc.ac.uc.clubplatform.models.CommentInfo
+import kc.ac.uc.clubplatform.models.CreateCommentRequest
 import java.text.SimpleDateFormat
 import java.util.*
+import android.widget.EditText
+import androidx.core.content.ContextCompat
+import kc.ac.uc.clubplatform.R
+import kc.ac.uc.clubplatform.models.UpdateCommentRequest
 
 class BoardActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBoardBinding
@@ -31,7 +36,9 @@ class BoardActivity : AppCompatActivity() {
     private var postId: Int? = null
     private var boardId: Int? = null
     private var clubId: Int = -1
-    private val comments = mutableListOf<String>()
+    private var anonymousCounter = 0 // 익명 번호 카운터
+    private val anonymousMap = mutableMapOf<String, String>() // userId -> 익명번호 매핑
+    private val comments = mutableListOf<CommentInfo>()
     private lateinit var commentsAdapter: CommentAdapter
     private val posts = mutableListOf<PostInfo>()
     private lateinit var postAdapter: PostAdapter
@@ -118,9 +125,106 @@ class BoardActivity : AppCompatActivity() {
     }
 
     private fun setupCommentAdapter() {
-        commentsAdapter = CommentAdapter(comments)
+        commentsAdapter = CommentAdapter(comments) { action, comment ->
+            when (action) {
+                "like" -> {
+                    currentPost?.let { post ->
+                        toggleCommentLike(post.postId, comment.commentId)
+                    }
+                }
+                "edit" -> {
+                    showEditCommentDialog(comment)
+                }
+                "delete" -> {
+                    showDeleteCommentDialog(comment)
+                }
+                "reply" -> {
+                    showReplyDialog(comment)
+                }
+            }
+        }
         binding.rvComments.layoutManager = LinearLayoutManager(this)
         binding.rvComments.adapter = commentsAdapter
+    }
+
+    private fun showEditCommentDialog(comment: CommentInfo) {
+        val editText = EditText(this)
+        editText.setText(comment.content)
+
+        AlertDialog.Builder(this)
+            .setTitle("댓글 수정")
+            .setView(editText)
+            .setPositiveButton("수정") { _, _ ->
+                val newContent = editText.text.toString().trim()
+                if (newContent.isNotEmpty()) {
+                    currentPost?.let { post ->
+                        updateComment(post.postId, comment.commentId, newContent)
+                    }
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun showDeleteCommentDialog(comment: CommentInfo) {
+        AlertDialog.Builder(this)
+            .setTitle("댓글 삭제")
+            .setMessage("정말로 이 댓글을 삭제하시겠습니까?")
+            .setPositiveButton("삭제") { _, _ ->
+                currentPost?.let { post ->
+                    deleteComment(post.postId, comment.commentId)
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun showReplyDialog(parentComment: CommentInfo) {
+        val editText = EditText(this)
+        editText.hint = "대댓글을 입력하세요"
+
+        AlertDialog.Builder(this)
+            .setTitle("대댓글 작성")
+            .setView(editText)
+            .setPositiveButton("작성") { _, _ ->
+                val content = editText.text.toString().trim()
+                if (content.isNotEmpty()) {
+                    currentPost?.let { post ->
+                        createReply(post.postId, content, parentComment.commentId)
+                    }
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    // 대댓글 작성
+    private fun createReply(postId: Int, content: String, parentId: Int) {
+        lifecycleScope.launch {
+            try {
+                val request = CreateCommentRequest(
+                    content = content,
+                    isAnonymous = false, // 대댓글은 일단 익명 옵션 없이
+                    parentId = parentId
+                )
+
+                val response = ApiClient.apiService.createComment(postId, request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    showToast("대댓글이 작성되었습니다")
+                    loadComments(postId)
+                    currentPost?.let { post ->
+                        currentPost = post.copy(commentCount = post.commentCount + 1)
+                        updatePostStats()
+                    }
+                } else {
+                    val errorMessage = response.body()?.message ?: "대댓글 작성에 실패했습니다"
+                    showToast(errorMessage)
+                }
+            } catch (e: Exception) {
+                Log.e("BoardActivity", "Error creating reply", e)
+                showToast("대댓글 작성 중 오류가 발생했습니다")
+            }
+        }
     }
 
     private fun showPostList() {
@@ -314,6 +418,8 @@ class BoardActivity : AppCompatActivity() {
                     if (post != null) {
                         displayPostDetail(post)
                         currentPost = post
+                        // 댓글 목록도 함께 로드
+                        loadComments(postId)
                     }
                 } else {
                     showToast("게시글을 불러올 수 없습니다")
@@ -327,6 +433,164 @@ class BoardActivity : AppCompatActivity() {
         }
     }
 
+    // 댓글 목록 조회
+    private fun loadComments(postId: Int) {
+        lifecycleScope.launch {
+            try {
+                val response = ApiClient.apiService.getComments(postId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val commentList = response.body()?.comments ?: emptyList()
+                    updateCommentList(commentList)
+                } else {
+                    Log.e("BoardActivity", "Failed to load comments: ${response.body()?.message}")
+                }
+            } catch (e: Exception) {
+                Log.e("BoardActivity", "Error loading comments", e)
+            }
+        }
+    }
+
+    // 댓글 목록 업데이트
+    private fun updateCommentList(commentList: List<CommentInfo>) {
+        // 익명 번호 재설정
+        anonymousCounter = 0
+        anonymousMap.clear()
+
+        val processedComments = commentList.map { comment ->
+            if (comment.isAnonymous) {
+                val anonymousName = getAnonymousName(comment.authorName)
+                comment.copy(authorName = anonymousName)
+            } else {
+                comment
+            }
+        }
+
+        comments.clear()
+        comments.addAll(processedComments)
+        commentsAdapter.notifyDataSetChanged()
+    }
+
+    // 익명 이름 생성 - 같은 사용자는 같은 번호 유지
+    private fun getAnonymousName(originalAuthor: String): String {
+        return anonymousMap.getOrPut(originalAuthor) {
+            anonymousCounter++
+            "익명$anonymousCounter"
+        }
+    }
+
+    // 댓글 작성
+    private fun createComment(postId: Int, content: String) {
+        lifecycleScope.launch {
+            try {
+                val isAnonymous = binding.cbAnonymous.isChecked // 익명 체크박스 값 읽기
+
+                val request = CreateCommentRequest(
+                    content = content,
+                    isAnonymous = isAnonymous
+                )
+
+                val response = ApiClient.apiService.createComment(postId, request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    binding.etComment.setText("")
+                    binding.cbAnonymous.isChecked = false // 체크박스 초기화
+                    showToast("댓글이 작성되었습니다")
+                    // 댓글 목록 새로고침
+                    loadComments(postId)
+                    // 게시글의 댓글 수 업데이트
+                    currentPost?.let { post ->
+                        currentPost = post.copy(commentCount = post.commentCount + 1)
+                        updatePostStats()
+                    }
+                } else {
+                    val errorMessage = response.body()?.message ?: "댓글 작성에 실패했습니다"
+                    showToast(errorMessage)
+                }
+            } catch (e: Exception) {
+                Log.e("BoardActivity", "Error creating comment", e)
+                showToast("댓글 작성 중 오류가 발생했습니다")
+            }
+        }
+    }
+
+    // 댓글 수정
+    private fun updateComment(postId: Int, commentId: Int, content: String) {
+        lifecycleScope.launch {
+            try {
+                val request = UpdateCommentRequest(content = content)
+                val response = ApiClient.apiService.updateComment(postId, commentId, request)
+
+                if (response.isSuccessful && response.body()?.success == true) {
+                    showToast("댓글이 수정되었습니다")
+                    loadComments(postId)
+                } else {
+                    val errorMessage = response.body()?.message ?: "댓글 수정에 실패했습니다"
+                    showToast(errorMessage)
+                }
+            } catch (e: Exception) {
+                Log.e("BoardActivity", "Error updating comment", e)
+                showToast("댓글 수정 중 오류가 발생했습니다")
+            }
+        }
+    }
+
+    // 댓글 삭제
+    private fun deleteComment(postId: Int, commentId: Int) {
+        lifecycleScope.launch {
+            try {
+                val response = ApiClient.apiService.deleteComment(postId, commentId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    showToast("댓글이 삭제되었습니다")
+                    loadComments(postId)
+                    // 게시글의 댓글 수 업데이트
+                    currentPost?.let { post ->
+                        currentPost = post.copy(commentCount = post.commentCount - 1)
+                        updatePostStats()
+                    }
+                } else {
+                    val errorMessage = response.body()?.message ?: "댓글 삭제에 실패했습니다"
+                    showToast(errorMessage)
+                }
+            } catch (e: Exception) {
+                Log.e("BoardActivity", "Error deleting comment", e)
+                showToast("댓글 삭제 중 오류가 발생했습니다")
+            }
+        }
+    }
+
+    // 댓글 좋아요
+    private fun toggleCommentLike(postId: Int, commentId: Int) {
+        lifecycleScope.launch {
+            try {
+                val response = ApiClient.apiService.likeComment(postId, commentId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val likeResponse = response.body()!!
+                    // 댓글 목록에서 해당 댓글 찾아서 좋아요 상태 업데이트
+                    val commentIndex = comments.indexOfFirst { it.commentId == commentId }
+                    if (commentIndex != -1) {
+                        comments[commentIndex] = comments[commentIndex].copy(
+                            isLiked = likeResponse.isLiked,
+                            likeCount = likeResponse.likeCount
+                        )
+                        commentsAdapter.notifyItemChanged(commentIndex)
+                    }
+                } else {
+                    showToast("댓글 좋아요 처리 중 오류가 발생했습니다")
+                }
+            } catch (e: Exception) {
+                Log.e("BoardActivity", "Error toggling comment like", e)
+                showToast("댓글 좋아요 처리 중 오류가 발생했습니다")
+            }
+        }
+    }
+
+    // 게시글 통계 정보 업데이트 (조회수, 댓글수, 스크랩수)
+    private fun updatePostStats() {
+        currentPost?.let { post ->
+            binding.tvPostViewCount.text = post.viewCount.toString()
+            binding.tvPostCommentCount.text = post.commentCount.toString()
+        }
+    }
+
     private fun displayPostDetail(post: PostDetail) {
         binding.tvPostTitle.text = post.title
         binding.tvPostAuthor.text = if (post.isAnonymous) "익명" else post.authorName
@@ -335,8 +599,8 @@ class BoardActivity : AppCompatActivity() {
         // 마크다운 렌더링
         markwon.setMarkdown(binding.tvPostContent, post.content)
 
-        binding.tvPostViewCount.text = post.viewCount.toString()
-        binding.tvPostCommentCount.text = post.commentCount.toString()
+        // 통계 정보 업데이트
+        updatePostStats()
 
         // 좋아요/스크랩 버튼 상태 업데이트
         updateLikeButton(post.isLiked, post.likeCount)
@@ -441,18 +705,13 @@ class BoardActivity : AppCompatActivity() {
             }
         }
 
-        // 댓글 전송 버튼
+        // 댓글 전송 버튼 - 실제 API 구현으로 교체
         binding.btnSendComment.setOnClickListener {
             val commentText = binding.etComment.text.toString().trim()
             if (commentText.isNotEmpty()) {
-                // 임시로 로컬에 추가 (실제로는 API 호출 필요)
-                comments.add(commentText)
-                commentsAdapter.notifyItemInserted(comments.size - 1)
-                binding.rvComments.scrollToPosition(comments.size - 1)
-                binding.etComment.setText("")
-
-                // TODO: 실제 댓글 API 구현
-                showToast("댓글 API는 추후 구현 예정입니다")
+                currentPost?.let { post ->
+                    createComment(post.postId, commentText)
+                }
             }
         }
     }
@@ -502,15 +761,32 @@ class BoardActivity : AppCompatActivity() {
         }
     }
 
+    // 좋아요 버튼 상태 업데이트
     private fun updateLikeButton(isLiked: Boolean, likeCount: Int) {
+        if (isLiked) {
+            binding.btnLike.setTextColor(ContextCompat.getColor(this, R.color.white))
+            binding.btnLike.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_favorite_filled, 0, 0, 0)
+        } else {
+            binding.btnLike.setBackgroundColor(ContextCompat.getColor(this, R.color.light_gray))
+            binding.btnLike.setTextColor(ContextCompat.getColor(this, R.color.dark_gray))
+            binding.btnLike.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_favorite_border, 0, 0, 0)
+        }
         binding.btnLike.text = "공감 $likeCount"
-        binding.btnLike.isSelected = isLiked
-        // 선택된 상태에 따른 색상 변경은 selector로 처리
     }
 
+    // 스크랩 버튼 상태 업데이트
     private fun updateScrapButton(isScraped: Boolean) {
-        binding.btnScrap.text = if (isScraped) "스크랩됨" else "스크랩"
-        binding.btnScrap.isSelected = isScraped
+        if (isScraped) {
+            binding.btnScrap.setBackgroundColor(ContextCompat.getColor(this, R.color.blue))
+            binding.btnScrap.setTextColor(ContextCompat.getColor(this, R.color.white))
+            binding.btnScrap.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_bookmark_filled, 0, 0, 0)
+            binding.btnScrap.text = "스크랩"
+        } else {
+            binding.btnScrap.setBackgroundColor(ContextCompat.getColor(this, R.color.light_gray))
+            binding.btnScrap.setTextColor(ContextCompat.getColor(this, R.color.dark_gray))
+            binding.btnScrap.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_bookmark_border, 0, 0, 0)
+            binding.btnScrap.text = "스크랩"
+        }
     }
 
     private fun formatDate(dateString: String): String {
