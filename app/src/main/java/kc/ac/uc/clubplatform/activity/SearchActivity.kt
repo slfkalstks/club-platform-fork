@@ -1,4 +1,4 @@
-// SearchActivity.kt
+// 업데이트된 SearchActivity.kt
 package kc.ac.uc.clubplatform.activity
 
 import android.content.Intent
@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import kc.ac.uc.clubplatform.adapters.RecentSearchAdapter
 import kc.ac.uc.clubplatform.adapters.SearchResultAdapter
 import kc.ac.uc.clubplatform.databinding.ActivitySearchBinding
-import kc.ac.uc.clubplatform.models.Post
+import kc.ac.uc.clubplatform.models.PostInfo
 import kc.ac.uc.clubplatform.models.RecentSearch
 
 class SearchActivity : AppCompatActivity() {
@@ -20,7 +20,7 @@ class SearchActivity : AppCompatActivity() {
     private val recentSearches = mutableListOf<RecentSearch>()
 
     // 검색 결과 (실제로는 API 호출로 가져와야 함)
-    private val searchResults = mutableListOf<Post>()
+    private val searchResults = mutableListOf<PostInfo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,19 +122,56 @@ class SearchActivity : AppCompatActivity() {
         // 여기서는 샘플 데이터로 대체
 
         searchResults.clear()
-        searchResults.add(Post(1, "5월 정기 모임 안내", "5월 10일 오후 6시부터...", "관리자", "2025-05-01", 15, 3))
-        searchResults.add(Post(2, "춘계 MT 참가 신청", "이번 학기 춘계 MT...", "관리자", "2025-04-28", 32, 10))
-        searchResults.add(Post(3, "새내기를 위한 대학 생활 꿀팁", "1. 수강신청은 미리 준비하세요...", "선배01", "2025-04-25", 45, 8))
+
+        // PostInfo 모델로 샘플 데이터 생성
+        searchResults.add(PostInfo(
+            postId = 1,
+            title = "5월 정기 모임 안내",
+            content = "5월 10일 오후 6시부터 중앙도서관 스터디룸에서 정기 모임이 있습니다. 모든 회원 참석 부탁드립니다.",
+            authorName = "관리자",
+            createdAt = "2025-05-01T18:00:00",
+            viewCount = 15,
+            commentCount = 3,
+            isNotice = true
+        ))
+
+        searchResults.add(PostInfo(
+            postId = 2,
+            title = "춘계 MT 참가 신청",
+            content = "이번 학기 춘계 MT 참가 신청을 받습니다. 5월 24일부터 26일까지 2박 3일 일정입니다.",
+            authorName = "관리자",
+            createdAt = "2025-04-28T14:30:00",
+            viewCount = 32,
+            commentCount = 10,
+            isNotice = false
+        ))
+
+        searchResults.add(PostInfo(
+            postId = 3,
+            title = "새내기를 위한 대학 생활 꿀팁",
+            content = "1. 수강신청은 미리 준비하세요\n2. 도서관 이용방법을 숙지하세요\n3. 교수님 연구실 위치를 알아두세요",
+            authorName = "선배01",
+            createdAt = "2025-04-25T10:15:00",
+            viewCount = 45,
+            commentCount = 8,
+            isNotice = false
+        ))
 
         // 검색 결과가 있는 경우
         if (searchResults.isNotEmpty()) {
             binding.layoutRecentSearches.visibility = View.GONE
             binding.layoutSearchResults.visibility = View.VISIBLE
+            binding.rvSearchResults.visibility = View.VISIBLE
+            binding.tvNoSearchResults.visibility = View.GONE
 
             val adapter = SearchResultAdapter(searchResults) { post ->
                 // 검색 결과 클릭 이벤트 처리
                 val intent = Intent(this, BoardActivity::class.java)
-                intent.putExtra("post_id", post.id)
+                intent.putExtra("post_id", post.postId)
+                // 현재 동아리 ID 전달
+                val sharedPreferences = getSharedPreferences("user_prefs", MODE_PRIVATE)
+                val clubId = sharedPreferences.getInt("current_club_id", -1)
+                intent.putExtra("club_id", clubId)
                 startActivity(intent)
             }
 

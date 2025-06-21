@@ -251,7 +251,6 @@
                 android:text="익명"
                 android:textSize="14sp"/>
 
-            <!-- Continuing activity_board.xml -->
             <EditText
                 android:id="@+id/etComment"
                 android:layout_width="0dp"
@@ -270,7 +269,7 @@
                 android:layout_height="40dp"
                 android:src="@drawable/ic_send"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:tint="@color/colorPrimary"/>
+                android:tint="@color/light_gray"/>
         </LinearLayout>
     </LinearLayout>
 
