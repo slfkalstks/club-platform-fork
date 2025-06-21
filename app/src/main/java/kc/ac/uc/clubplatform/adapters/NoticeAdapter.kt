@@ -5,11 +5,11 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import kc.ac.uc.clubplatform.databinding.ItemNoticeBinding
-import kc.ac.uc.clubplatform.models.Post
+import kc.ac.uc.clubplatform.models.PostInfo
 
 class NoticeAdapter(
-    private val notices: List<Post>,
-    private val onItemClick: (Post) -> Unit
+    private val notices: List<PostInfo>,
+    private val onItemClick: (PostInfo) -> Unit
 ) : RecyclerView.Adapter<NoticeAdapter.NoticeViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoticeViewHolder {
@@ -30,10 +30,10 @@ class NoticeAdapter(
     inner class NoticeViewHolder(private val binding: ItemNoticeBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(post: Post) {
+        fun bind(post: PostInfo) {
             binding.tvTitle.text = post.title
-            binding.tvAuthor.text = post.author
-            binding.tvDate.text = post.date
+            binding.tvAuthor.text = post.authorName
+            binding.tvDate.text = post.createdAt
             binding.tvCommentCount.text = post.commentCount.toString()
             binding.tvViewCount.text = post.viewCount.toString()
 
