@@ -87,6 +87,39 @@ interface ApiService {
 
     @GET("posts/hot")
     suspend fun getHotPosts(): Response<SpecialBoardResponse>
+
+    // 댓글 목록 조회
+    @GET("posts/{post_id}/comments")
+    suspend fun getComments(@Path("post_id") postId: Int): Response<CommentListResponse>
+
+    // 댓글 작성
+    @POST("posts/{post_id}/comments")
+    suspend fun createComment(
+        @Path("post_id") postId: Int,
+        @Body request: CreateCommentRequest
+    ): Response<CreateCommentResponse>
+
+    // 댓글 수정
+    @PUT("posts/{post_id}/comments/{comment_id}")
+    suspend fun updateComment(
+        @Path("post_id") postId: Int,
+        @Path("comment_id") commentId: Int,
+        @Body request: UpdateCommentRequest
+    ): Response<UpdateCommentResponse>
+
+    // 댓글 삭제
+    @DELETE("posts/{post_id}/comments/{comment_id}")
+    suspend fun deleteComment(
+        @Path("post_id") postId: Int,
+        @Path("comment_id") commentId: Int
+    ): Response<DeleteCommentResponse>
+
+    // 댓글 좋아요
+    @POST("posts/{post_id}/comments/{comment_id}/like")
+    suspend fun likeComment(
+        @Path("post_id") postId: Int,
+        @Path("comment_id") commentId: Int
+    ): Response<CommentLikeResponse>
 }
 
 

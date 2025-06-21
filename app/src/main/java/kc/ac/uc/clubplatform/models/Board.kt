@@ -26,3 +26,4 @@ data class BoardDetailResponse(
     val board: BoardInfo,
     val recentPosts: List<PostInfo>
 )
+
