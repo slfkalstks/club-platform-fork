@@ -111,3 +111,66 @@ data class SpecialBoardResponse(
     val posts: List<PostInfo>,
     val totalCount: Int
 )
+
+// 댓글 정보
+@Parcelize
+data class CommentInfo(
+    val commentId: Int,
+    val content: String,
+    val authorName: String,
+    val createdAt: String,
+    val likeCount: Int,
+    val isLiked: Boolean,
+    val isAnonymous: Boolean,
+    val parentId: Int?, // 대댓글인 경우 부모 댓글 ID
+    val canEdit: Boolean,
+    val canDelete: Boolean
+) : Parcelable
+
+// 댓글 목록 응답
+data class CommentListResponse(
+    val success: Boolean,
+    val message: String,
+    val comments: List<CommentInfo>
+)
+
+// 댓글 작성 요청
+data class CreateCommentRequest(
+    val content: String,
+    val isAnonymous: Boolean,
+    val parentId: Int? = null // 대댓글인 경우
+)
+
+// 댓글 작성 응답
+data class CreateCommentResponse(
+    val success: Boolean,
+    val message: String,
+    val commentId: Int?,
+    val createdAt: String?
+)
+
+// 댓글 수정 요청
+data class UpdateCommentRequest(
+    val content: String
+)
+
+// 댓글 수정 응답
+data class UpdateCommentResponse(
+    val success: Boolean,
+    val message: String,
+    val data: CommentInfo?
+)
+
+// 댓글 좋아요 응답
+data class CommentLikeResponse(
+    val success: Boolean,
+    val message: String,
+    val isLiked: Boolean,
+    val likeCount: Int
+)
+
+// 댓글 삭제 응답
+data class DeleteCommentResponse(
+    val success: Boolean,
+    val message: String
+)
