@@ -1,20 +1,9 @@
 package kc.ac.uc.clubplatform.api
 
-import kc.ac.uc.clubplatform.models.BoardDetailResponse
-import kc.ac.uc.clubplatform.models.BoardListResponse
-import kc.ac.uc.clubplatform.models.ClubJoinRequest
-import kc.ac.uc.clubplatform.models.ClubJoinResponse
-import kc.ac.uc.clubplatform.models.ClubListResponse
-import kc.ac.uc.clubplatform.models.MyClubsResponse
-import kc.ac.uc.clubplatform.models.PostDetailResponse
-import kc.ac.uc.clubplatform.models.PostListResponse
+import kc.ac.uc.clubplatform.models.*
 import okhttp3.ResponseBody
 import retrofit2.Response
-import retrofit2.http.Body
-import retrofit2.http.GET
-import retrofit2.http.POST
-import retrofit2.http.Path
-import retrofit2.http.Query
+import retrofit2.http.*
 
 interface ApiService {
     @POST("auth/login")
@@ -75,8 +64,62 @@ interface ApiService {
     @GET("posts/{post_id}")
     suspend fun getPostDetail(@Path("post_id") postId: Int): Response<PostDetailResponse>
 
-    @GET("board/{board_id}")
-    suspend fun getBoardDetail(@Path("board_id") boardId: Int): Response<BoardDetailResponse>
+    @POST("posts")
+    suspend fun createPost(@Body request: CreatePostRequest): Response<CreatePostResponse>
+
+    @PUT("posts/{postId}")
+    suspend fun updatePost(
+        @Path("postId") postId: Int,
+        @Body request: UpdatePostRequest
+    ): Response<UpdatePostResponse>
+
+    @DELETE("posts/{postId}")
+    suspend fun deletePost(@Path("postId") postId: Int): Response<DeletePostResponse>
+
+    @POST("posts/{postId}/like")
+    suspend fun likePost(@Path("postId") postId: Int): Response<LikeResponse>
+
+    @POST("posts/{postId}/scrap")
+    suspend fun scrapPost(@Path("postId") postId: Int): Response<ScrapResponse>
+
+    @GET("posts/best")
+    suspend fun getBestPosts(): Response<SpecialBoardResponse>
+
+    @GET("posts/hot")
+    suspend fun getHotPosts(): Response<SpecialBoardResponse>
+
+    // 댓글 목록 조회
+    @GET("posts/{post_id}/comments")
+    suspend fun getComments(@Path("post_id") postId: Int): Response<CommentListResponse>
+
+    // 댓글 작성
+    @POST("posts/{post_id}/comments")
+    suspend fun createComment(
+        @Path("post_id") postId: Int,
+        @Body request: CreateCommentRequest
+    ): Response<CreateCommentResponse>
+
+    // 댓글 수정
+    @PUT("posts/{post_id}/comments/{comment_id}")
+    suspend fun updateComment(
+        @Path("post_id") postId: Int,
+        @Path("comment_id") commentId: Int,
+        @Body request: UpdateCommentRequest
+    ): Response<UpdateCommentResponse>
+
+    // 댓글 삭제
+    @DELETE("posts/{post_id}/comments/{comment_id}")
+    suspend fun deleteComment(
+        @Path("post_id") postId: Int,
+        @Path("comment_id") commentId: Int
+    ): Response<DeleteCommentResponse>
+
+    // 댓글 좋아요
+    @POST("posts/{post_id}/comments/{comment_id}/like")
+    suspend fun likeComment(
+        @Path("post_id") postId: Int,
+        @Path("comment_id") commentId: Int
+    ): Response<CommentLikeResponse>
 }
 
 

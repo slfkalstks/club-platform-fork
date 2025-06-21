@@ -177,17 +177,7 @@ class HomeFragment : Fragment() {
                     val posts = response.body()?.posts ?: emptyList()
 
                     // PostInfo를 Post 모델로 변환
-                    val convertedPosts = posts.take(3).map { postInfo ->
-                        Post(
-                            id = postInfo.postId,
-                            title = postInfo.title,
-                            content = postInfo.content,
-                            author = postInfo.authorName,
-                            date = formatDate(postInfo.createdAt),
-                            viewCount = postInfo.viewCount,
-                            commentCount = postInfo.commentCount
-                        )
-                    }
+                    val convertedPosts = posts.take(3)
 
                     if (isNotice) {
                         setupNoticesRecyclerView(convertedPosts, board)
@@ -205,12 +195,12 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun setupNoticesRecyclerView(notices: List<Post>, board: BoardInfo) {
+    private fun setupNoticesRecyclerView(notices: List<PostInfo>, board: BoardInfo) {
         val adapter = NoticeAdapter(notices) { post ->
             // 공지사항 클릭 이벤트 처리
             val intent = Intent(requireContext(), BoardActivity::class.java)
             intent.putExtra("board_type", board.type)
-            intent.putExtra("post_id", post.id)
+            intent.putExtra("post_id", post.postId)
             intent.putExtra("board_id", board.boardId)
             startActivity(intent)
         }
@@ -227,7 +217,7 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun setupTipsRecyclerView(tips: List<Post>, board: BoardInfo) {
+    private fun setupTipsRecyclerView(tips: List<PostInfo>, board: BoardInfo) {
         // 두 번째 섹션 제목을 게시판 이름으로 동적 설정
         binding.tvTipsTitle.text = board.name
 
@@ -235,7 +225,7 @@ class HomeFragment : Fragment() {
             // 팁 클릭 이벤트 처리
             val intent = Intent(requireContext(), BoardActivity::class.java)
             intent.putExtra("board_type", board.type)
-            intent.putExtra("post_id", post.id)
+            intent.putExtra("post_id", post.postId)
             intent.putExtra("board_id", board.boardId)
             startActivity(intent)
         }

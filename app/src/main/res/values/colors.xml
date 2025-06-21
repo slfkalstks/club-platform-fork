@@ -9,4 +9,6 @@
     <color name="dark_gray">#555555</color>
     <color name="very_light_gray">#F5F5F5</color>
     <color name="colorSelectedItem">#E8F0FE</color>
+    <color name="red">#F44336</color>
+    <color name="blue">#2196F3</color>
 </resources>

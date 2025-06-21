@@ -95,4 +95,13 @@ dependencies {
     implementation ("com.github.bumptech.glide:glide:4.15.1")
     implementation ("com.github.bumptech.glide:okhttp3-integration:4.15.1")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
+
+    // 마크다운
+    implementation ("io.noties.markwon:core:4.6.2")
+    implementation ("io.noties.markwon:editor:4.6.2")
+    implementation ("io.noties.markwon:ext-strikethrough:4.6.2")
+    implementation ("io.noties.markwon:ext-tables:4.6.2")
+    implementation ("io.noties.markwon:html:4.6.2")
+    implementation ("io.noties.markwon:image:4.6.2")
+    implementation ("io.noties.markwon:linkify:4.6.2")
 }
