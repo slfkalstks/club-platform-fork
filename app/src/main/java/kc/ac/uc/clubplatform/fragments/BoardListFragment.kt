@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.lifecycle.lifecycleScope
+import androidx.activity.result.contract.ActivityResultContracts
 import kc.ac.uc.clubplatform.activity.BoardActivity
 import kc.ac.uc.clubplatform.adapters.BoardAdapter
 import kc.ac.uc.clubplatform.databinding.FragmentBoardListBinding
@@ -25,6 +26,15 @@ class BoardListFragment : Fragment() {
     private val boards = mutableListOf<Board>()
     private lateinit var boardAdapter: BoardAdapter
     private var clubId: Int = -1
+
+    private val boardActivityLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            // 게시판에서 변경사항이 있었으면 목록 새로고침
+            loadBoardList()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -53,7 +63,7 @@ class BoardListFragment : Fragment() {
             intent.putExtra("board_id", board.id)
             intent.putExtra("board_name", board.name)
             intent.putExtra("club_id", clubId)
-            startActivity(intent)
+            boardActivityLauncher.launch(intent)
         }
 
         binding.rvBoards.layoutManager = LinearLayoutManager(requireContext())
