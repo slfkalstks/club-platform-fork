@@ -4,6 +4,7 @@ package kc.ac.uc.clubplatform.fragments
 import android.app.Dialog
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -20,8 +21,7 @@ import kc.ac.uc.clubplatform.activity.ClubJoinActivity
 import kc.ac.uc.clubplatform.adapters.NoticeAdapter
 import kc.ac.uc.clubplatform.adapters.TipAdapter
 import kc.ac.uc.clubplatform.adapters.ClubListAdapter
-import kc.ac.uc.clubplatform.models.Post
-import kc.ac.uc.clubplatform.models.Club
+import kc.ac.uc.clubplatform.models.*
 import kc.ac.uc.clubplatform.api.ApiClient
 import kc.ac.uc.clubplatform.databinding.DialogClubListBinding
 import kotlinx.coroutines.launch
@@ -29,6 +29,9 @@ import kotlinx.coroutines.launch
 class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+
+    private var noticeBoard: BoardInfo? = null
+    private var secondBoard: BoardInfo? = null // Tips 또는 다른 게시판
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -43,7 +46,6 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupHeader()
-        setupBoardButtons()
         loadCurrentClubData()
     }
 
@@ -78,8 +80,7 @@ class HomeFragment : Fragment() {
         if (currentClubId != -1 && !currentClubName.isNullOrEmpty()) {
             // 저장된 동아리 정보가 있으면 바로 표시
             binding.tvClubName.text = currentClubName
-            setupNoticesRecyclerView(currentClubId)
-            setupTipsRecyclerView(currentClubId)
+            loadClubBoards(currentClubId)
         } else {
             // 저장된 정보가 없으면 API로 동아리 목록 조회
             loadMyClubsAndSetCurrent()
@@ -114,26 +115,130 @@ class HomeFragment : Fragment() {
                         }
 
                         binding.tvClubName.text = currentClub.name
-                        setupNoticesRecyclerView(currentClub.clubId)
-                        setupTipsRecyclerView(currentClub.clubId)
+                        loadClubBoards(currentClub.clubId)
                     } else {
                         // 가입된 동아리가 없는 경우
                         binding.tvClubName.text = "동아리 없음"
-                        setupNoticesRecyclerView(-1)
-                        setupTipsRecyclerView(-1)
+                        showEmptyState()
                     }
                 } else {
                     // API 호출 실패 시 기본값 설정
                     binding.tvClubName.text = "동아리 정보 없음"
-                    setupNoticesRecyclerView(-1)
-                    setupTipsRecyclerView(-1)
+                    showEmptyState()
                 }
             } catch (e: Exception) {
                 // 네트워크 오류 시 기본값 설정
                 binding.tvClubName.text = "네트워크 오류"
-                setupNoticesRecyclerView(-1)
-                setupTipsRecyclerView(-1)
+                showEmptyState()
+                Log.e("HomeFragment", "Failed to load club data", e)
             }
+        }
+    }
+
+    private fun loadClubBoards(clubId: Int) {
+        lifecycleScope.launch {
+            try {
+                val response = ApiClient.apiService.getBoardsByClub(clubId)
+
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val boards = response.body()?.boards ?: emptyList()
+
+                    // 공지사항 게시판과 두 번째 게시판 찾기
+                    noticeBoard = boards.find { it.type == "notice" }
+                    secondBoard = boards.find { it.type in listOf("tips", "general", "hot", "best") }
+
+                    // 공지사항 로드
+                    noticeBoard?.let { board ->
+                        loadBoardPosts(board, true)
+                    } ?: showEmptyNotices()
+
+                    // 두 번째 게시판 로드 (Tips 등)
+                    secondBoard?.let { board ->
+                        loadBoardPosts(board, false)
+                    } ?: showEmptyTips()
+
+                } else {
+                    Log.e("HomeFragment", "Failed to load boards: ${response.message()}")
+                    showEmptyState()
+                }
+            } catch (e: Exception) {
+                Log.e("HomeFragment", "Exception loading boards", e)
+                showEmptyState()
+            }
+        }
+    }
+
+    private fun loadBoardPosts(board: BoardInfo, isNotice: Boolean) {
+        lifecycleScope.launch {
+            try {
+                val response = ApiClient.apiService.getPostsByBoard(board.boardId, board.type)
+
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val posts = response.body()?.posts ?: emptyList()
+
+                    // PostInfo를 Post 모델로 변환
+                    val convertedPosts = posts.take(3)
+
+                    if (isNotice) {
+                        setupNoticesRecyclerView(convertedPosts, board)
+                    } else {
+                        setupTipsRecyclerView(convertedPosts, board)
+                    }
+
+                } else {
+                    if (isNotice) showEmptyNotices() else showEmptyTips()
+                }
+            } catch (e: Exception) {
+                Log.e("HomeFragment", "Exception loading posts for board ${board.boardId}", e)
+                if (isNotice) showEmptyNotices() else showEmptyTips()
+            }
+        }
+    }
+
+    private fun setupNoticesRecyclerView(notices: List<PostInfo>, board: BoardInfo) {
+        val adapter = NoticeAdapter(notices) { post ->
+            // 공지사항 클릭 이벤트 처리
+            val intent = Intent(requireContext(), BoardActivity::class.java)
+            intent.putExtra("board_type", board.type)
+            intent.putExtra("post_id", post.postId)
+            intent.putExtra("board_id", board.boardId)
+            startActivity(intent)
+        }
+
+        binding.rvNotices.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvNotices.adapter = adapter
+
+        // 공지사항 더보기 버튼 클릭 이벤트
+        binding.btnMoreNotices.setOnClickListener {
+            val intent = Intent(requireContext(), BoardActivity::class.java)
+            intent.putExtra("board_type", board.type)
+            intent.putExtra("board_id", board.boardId)
+            startActivity(intent)
+        }
+    }
+
+    private fun setupTipsRecyclerView(tips: List<PostInfo>, board: BoardInfo) {
+        // 두 번째 섹션 제목을 게시판 이름으로 동적 설정
+        binding.tvTipsTitle.text = board.name
+
+        val adapter = TipAdapter(tips) { post ->
+            // 팁 클릭 이벤트 처리
+            val intent = Intent(requireContext(), BoardActivity::class.java)
+            intent.putExtra("board_type", board.type)
+            intent.putExtra("post_id", post.postId)
+            intent.putExtra("board_id", board.boardId)
+            startActivity(intent)
+        }
+
+        binding.rvTips.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvTips.adapter = adapter
+
+        // 팁 더보기 버튼 클릭 이벤트
+        binding.btnMoreTips.setOnClickListener {
+            val intent = Intent(requireContext(), BoardActivity::class.java)
+            intent.putExtra("board_type", board.type)
+            intent.putExtra("board_id", board.boardId)
+            startActivity(intent)
         }
     }
 
@@ -203,8 +308,7 @@ class HomeFragment : Fragment() {
 
             // UI 즉시 업데이트
             binding.tvClubName.text = selectedClub.name
-            setupNoticesRecyclerView(selectedClub.clubId)
-            setupTipsRecyclerView(selectedClub.clubId)
+            loadClubBoards(selectedClub.clubId)
 
             Toast.makeText(requireContext(), "${selectedClub.name}(으)로 전환되었습니다", Toast.LENGTH_SHORT).show()
             dialog.dismiss()
@@ -222,99 +326,31 @@ class HomeFragment : Fragment() {
             .apply()
     }
 
-    private fun setupNoticesRecyclerView(clubId: Int) {
-        // 현재 동아리에 맞는 공지사항 데이터 (나중에 실제 API로 교체)
-        val notices = if (clubId > 0) {
-            getNoticesForClub(clubId)
-        } else {
-            emptyList()
-        }
 
-        val adapter = NoticeAdapter(notices) { post ->
-            // 공지사항 클릭 이벤트 처리
-            val intent = Intent(requireContext(), BoardActivity::class.java)
-            intent.putExtra("board_type", "notice")
-            intent.putExtra("post_id", post.id)
-            intent.putExtra("club_id", clubId)
-            startActivity(intent)
-        }
-
-        binding.rvNotices.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvNotices.adapter = adapter
-
-        // 공지사항 더보기 버튼 클릭 이벤트
-        binding.btnMoreNotices.setOnClickListener {
-            val intent = Intent(requireContext(), BoardActivity::class.java)
-            intent.putExtra("board_type", "notice")
-            intent.putExtra("club_id", clubId)
-            startActivity(intent)
-        }
+    private fun showEmptyState() {
+        showEmptyNotices()
+        showEmptyTips()
     }
 
-    private fun setupTipsRecyclerView(clubId: Int) {
-        // 현재 동아리에 맞는 팁 데이터 (나중에 실제 API로 교체)
-        val tips = if (clubId > 0) {
-            getTipsForClub(clubId)
-        } else {
-            emptyList()
-        }
-
-        val adapter = TipAdapter(tips) { post ->
-            // 팁 클릭 이벤트 처리
-            val intent = Intent(requireContext(), BoardActivity::class.java)
-            intent.putExtra("board_type", "tips")
-            intent.putExtra("post_id", post.id)
-            intent.putExtra("club_id", clubId)
-            startActivity(intent)
-        }
-
-        binding.rvTips.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvTips.adapter = adapter
-
-        // 팁 더보기 버튼 클릭 이벤트
-        binding.btnMoreTips.setOnClickListener {
-            val intent = Intent(requireContext(), BoardActivity::class.java)
-            intent.putExtra("board_type", "tips")
-            intent.putExtra("club_id", clubId)
-            startActivity(intent)
-        }
+    private fun showEmptyNotices() {
+        binding.rvNotices.adapter = NoticeAdapter(emptyList()) { }
     }
 
-    // 동아리별 공지사항 데이터 (임시 - 나중에 실제 API로 교체)
-    private fun getNoticesForClub(clubId: Int): List<Post> {
-        return listOf(
-            Post(1, "동아리 정기 모임 안내", "이번 주 정기 모임은 금요일 오후 6시에...", "관리자", "2025-06-18", 15, 3),
-            Post(2, "동아리 활동 관련 공지", "다음 주부터 새로운 프로젝트를 시작합니다...", "관리자", "2025-06-15", 32, 10)
-        )
+    private fun showEmptyTips() {
+        binding.rvTips.adapter = TipAdapter(emptyList()) { }
     }
 
-    // 동아리별 팁 데이터 (임시 - 나중에 실제 API로 교체)
-    private fun getTipsForClub(clubId: Int): List<Post> {
-        return listOf(
-            Post(3, "동아리 활동 꿀팁", "동아리 활동을 할 때 이것만은 꼭...", "선배01", "2025-06-10", 45, 8),
-            Post(4, "새내기를 위한 가이드", "동아리에 처음 가입한 새내기들을 위한...", "회장", "2025-06-08", 38, 12)
-        )
-    }
-
-    private fun setupBoardButtons() {
-        // 현재 동아리 ID 가져오기
-        val sharedPreferences = requireContext().getSharedPreferences("user_prefs", android.content.Context.MODE_PRIVATE)
-        val currentClubId = sharedPreferences.getInt("current_club_id", -1)
-
-        // 일반 게시판 버튼 클릭 이벤트
-        binding.btnGeneralBoard.setOnClickListener {
-            val intent = Intent(requireContext(), BoardActivity::class.java)
-            intent.putExtra("board_type", "general")
-            intent.putExtra("club_id", currentClubId)
-            startActivity(intent)
-        }
-
-        // 공지 게시판 버튼 클릭 이벤트
-        binding.btnNoticeBoard.setOnClickListener {
-            val intent = Intent(requireContext(), BoardActivity::class.java)
-            intent.putExtra("board_type", "notice")
-            intent.putExtra("club_id", currentClubId)
-            startActivity(intent)
+    private fun formatDate(dateString: String): String {
+        // API에서 받아온 날짜 문자열을 적절한 형식으로 변환
+        // 예: "2025-06-21T10:30:00" -> "2025-06-21"
+        return try {
+            if (dateString.contains("T")) {
+                dateString.split("T")[0]
+            } else {
+                dateString
+            }
+        } catch (e: Exception) {
+            dateString
         }
     }
 
@@ -333,8 +369,7 @@ class HomeFragment : Fragment() {
             binding.tvClubName.text = currentClubName
             // 데이터 새로고침은 필요시에만 (성능 고려)
             if (binding.rvNotices.adapter == null) {
-                setupNoticesRecyclerView(currentClubId)
-                setupTipsRecyclerView(currentClubId)
+                loadClubBoards(currentClubId)
             }
         }
     }

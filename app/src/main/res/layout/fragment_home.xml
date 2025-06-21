@@ -107,8 +107,7 @@
                     android:padding="8dp" />
             </androidx.cardview.widget.CardView>
 
-            <!-- Continuing fragment_home.xml -->
-            <!-- Tips 섹션 -->
+            <!-- Tips 섹션 (동적 제목) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -116,10 +115,11 @@
                 android:layout_marginBottom="8dp">
 
                 <TextView
+                    android:id="@+id/tvTipsTitle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Tips"
+                    android:text="게시판"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -146,52 +146,7 @@
                     android:padding="8dp" />
             </androidx.cardview.widget.CardView>
 
-            <!-- 게시판 목록 섹션 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="게시판 목록"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
 
-            <androidx.cardview.widget.CardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="2dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="8dp">
-
-                    <TextView
-                        android:id="@+id/btnGeneralBoard"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="일반게시판"
-                        android:padding="12dp"
-                        android:drawableEnd="@drawable/ic_chevron_right"
-                        android:background="?attr/selectableItemBackground" />
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/light_gray" />
-
-                    <TextView
-                        android:id="@+id/btnNoticeBoard"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="공지게시판"
-                        android:padding="12dp"
-                        android:drawableEnd="@drawable/ic_chevron_right"
-                        android:background="?attr/selectableItemBackground" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
         </LinearLayout>
     </ScrollView>
 </LinearLayout>
