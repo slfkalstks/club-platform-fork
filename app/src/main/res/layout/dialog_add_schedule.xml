@@ -1,203 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#F8F9FA">
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:hint="제목"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:hint="시작 날짜"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etStartDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="date"
+            android:focusable="false"
+            android:clickable="false"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:hint="종료 날짜"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etEndDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="date"
+            android:focusable="false"
+            android:clickable="false"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:hint="시간 (클릭하여 선택)"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="none"
+            android:focusable="false"
+            android:clickable="true"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:hint="장소"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etPlace"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:hint="내용"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="textMultiLine"
+            android:minLines="3"
+            android:gravity="top|start" />
+    </com.google.android.material.textfield.TextInputLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:orientation="horizontal"
+        android:gravity="end">
 
-        <!-- 제목 -->
-        <TextView
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCancel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="새 일정 추가"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="#2C3E50"
-            android:layout_marginBottom="24dp"
-            android:layout_gravity="center_horizontal"/>
+            android:layout_marginEnd="8dp"
+            android:text="취소"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
 
-        <!-- 일정 제목 -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:boxStrokeColor="#3498DB"
-            app:hintTextColor="#3498DB"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="일정 제목"
-                android:textSize="16sp"
-                android:drawableStart="@drawable/ic_event"
-                android:drawablePadding="12dp"/>
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- 날짜 섹션 -->
-        <TextView
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSave"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📅 날짜"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#34495E"
-            android:layout_marginBottom="12dp"/>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
-            <!-- 시작 날짜 -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                app:boxStrokeColor="#E74C3C"
-                app:hintTextColor="#E74C3C"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etStartDate"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="시작 날짜"
-                    android:inputType="date"
-                    android:textSize="14sp"
-                    android:focusable="false"
-                    android:clickable="true"/>
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- 종료 날짜 -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                app:boxStrokeColor="#E74C3C"
-                app:hintTextColor="#E74C3C"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etEndDate"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="종료 날짜"
-                    android:inputType="date"
-                    android:textSize="14sp"
-                    android:focusable="false"
-                    android:clickable="true"/>
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-        </LinearLayout>
-
-        <!-- 시간 -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:boxStrokeColor="#9B59B6"
-            app:hintTextColor="#9B59B6"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etTime"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="시간 (예: 18:00~20:00)"
-                android:textSize="16sp"
-                android:drawableStart="@drawable/ic_access_time"
-                android:drawablePadding="12dp"
-                android:focusable="false"
-                android:clickable="true"/>
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- 장소 -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:boxStrokeColor="#27AE60"
-            app:hintTextColor="#27AE60"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etPlace"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="장소"
-                android:textSize="16sp"
-                android:drawableStart="@drawable/ic_location_on"
-                android:drawablePadding="12dp"/>
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- 상세 내용 -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:boxStrokeColor="#F39C12"
-            app:hintTextColor="#F39C12"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etContent"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="상세 내용"
-                android:textSize="16sp"
-                android:lines="4"
-                android:gravity="top"
-                android:inputType="textMultiLine"
-                android:drawableStart="@drawable/ic_description"
-                android:drawablePadding="12dp"/>
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- 버튼 영역 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="end">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCancel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="취소"
-                android:layout_marginEnd="12dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:strokeColor="#95A5A6"
-                android:textColor="#7F8C8D"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSave"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="저장"
-                android:backgroundTint="#3498DB"
-                android:textColor="@android:color/white"
-                app:icon="@drawable/ic_save"
-                app:iconGravity="textStart"/>
-
-        </LinearLayout>
-
+            android:text="저장"
+            app:cornerRadius="8dp" />
     </LinearLayout>
-
-</ScrollView>
+</LinearLayout>
