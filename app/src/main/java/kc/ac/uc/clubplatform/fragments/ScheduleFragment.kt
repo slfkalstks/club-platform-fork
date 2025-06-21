@@ -11,34 +11,27 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import kc.ac.uc.clubplatform.R
+import kc.ac.uc.clubplatform.api.ApiClient
 import kc.ac.uc.clubplatform.databinding.FragmentScheduleBinding
+import kc.ac.uc.clubplatform.models.Schedule
+import kc.ac.uc.clubplatform.models.ScheduleRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import ru.cleverpumpkin.calendar.CalendarDate
 import ru.cleverpumpkin.calendar.CalendarView.SelectionMode
 import ru.cleverpumpkin.calendar.CalendarView.DateIndicator
 import java.text.SimpleDateFormat
 import java.util.*
 
-data class ScheduleData(
-    val scheduleId: Int,
-    val clubId: Int,
-    val title: String,
-    val description: String?,
-    val startDate: Date,
-    val endDate: Date?,
-    val allDay: Boolean,
-    val createdBy: Int
-)
-
 // DateIndicator 구현체로 점 표시
-data class MyIndicator(
+data class ScheduleIndicator(
     override val date: CalendarDate,
-    override val color: Int
+    override val color: Int,
+    val scheduleId: Int  // 해당 일정의 ID
 ) : DateIndicator
 
 class ScheduleFragment : Fragment() {
@@ -46,9 +39,12 @@ class ScheduleFragment : Fragment() {
     private var _binding: FragmentScheduleBinding? = null
     private val binding get() = _binding!!
 
-    private val scheduleList = mutableListOf<ScheduleData>()
+    private val scheduleList = mutableListOf<Schedule>()
     private var selectedDate: CalendarDate? = null
-    private val indicatorList = mutableListOf<MyIndicator>()
+    private val indicatorList = mutableListOf<ScheduleIndicator>()
+    
+    // 현재 사용자의 동아리 ID (실제로는 세션이나 설정에서 가져와야 함)
+    private var currentClubId = -1
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -63,7 +59,7 @@ class ScheduleFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupCalendar()
         setupFAB()
-        fetchSchedulesFromApi()
+        fetchSchedules()
     }
 
     private fun setupCalendar() {
@@ -95,124 +91,114 @@ class ScheduleFragment : Fragment() {
 
     private fun setupFAB() {
         binding.fabAddSchedule.setOnClickListener {
-            val dialogView = LayoutInflater.from(requireContext())
-                .inflate(R.layout.dialog_add_schedule, null, false)
+            showAddScheduleDialog()
+        }
+    }
 
-            val etTitle = dialogView.findViewById<EditText>(R.id.etTitle)
-            val etStartDate = dialogView.findViewById<EditText>(R.id.etStartDate)
-            val etEndDate = dialogView.findViewById<EditText>(R.id.etEndDate)
-            val etTime = dialogView.findViewById<EditText>(R.id.etTime)
-            val etContent = dialogView.findViewById<EditText>(R.id.etContent)
-            val btnSave = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSave)
-            val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
+    private fun showAddScheduleDialog() {
+        val dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_add_schedule, null, false)
 
-            // 시간 필드에 클릭 리스너 추가
-            etTime.setOnClickListener {
-                showTimePickerDialog { startTime, endTime ->
-                    // 선택된 시간을 텍스트 필드에 표시
-                    etTime.setText("$startTime ~ $endTime")
-                }
+        val etTitle = dialogView.findViewById<EditText>(R.id.etTitle)
+        val etStartDate = dialogView.findViewById<EditText>(R.id.etStartDate)
+        val etEndDate = dialogView.findViewById<EditText>(R.id.etEndDate)
+        val etTime = dialogView.findViewById<EditText>(R.id.etTime)
+        val etPlace = dialogView.findViewById<EditText>(R.id.etPlace) // 장소 필드 추가
+        val etContent = dialogView.findViewById<EditText>(R.id.etContent)
+        val btnSave = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSave)
+        val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
+
+        // 시간 필드에 클릭 리스너 추가
+        etTime.setOnClickListener {
+            showTimePickerDialog { startTime, endTime ->
+                // 선택된 시간을 텍스트 필드에 표시
+                etTime.setText("$startTime ~ $endTime")
+            }
+        }
+
+        // 선택된 날짜 범위를 가져와서 시작일과 종료일 필드에 설정
+        val (startDate, endDate) = getSelectedDateRange()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+        if (startDate != null) {
+            etStartDate.setText(dateFormat.format(startDate))
+            // 종료일이 없으면(단일 날짜 선택) 시작일과 동일하게 설정
+            val finalEndDate = endDate ?: startDate
+            etEndDate.setText(dateFormat.format(finalEndDate))
+        }
+
+        // AlertDialog 객체 생성
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("일정 추가")
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
+
+        // 저장 버튼 클릭 리스너
+        btnSave.setOnClickListener {
+            val title = etTitle.text.toString()
+            val startDateStr = etStartDate.text.toString()
+            val endDateStr = etEndDate.text.toString()
+            val timeStr = etTime.text.toString()
+            val place = etPlace.text.toString()
+            val content = etContent.text.toString()
+
+            if (title.isBlank() || startDateStr.isBlank() || endDateStr.isBlank()) {
+                Toast.makeText(requireContext(), "제목과 날짜를 입력하세요.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
 
-            // 선택된 날짜 범위를 가져와서 시작일과 종료일 필드에 설정
-            val (startDate, endDate) = getSelectedDateRange()
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            // 날짜와 시간 파싱
+            val startTimeStr = if (timeStr.contains("~")) timeStr.split("~")[0].trim() else ""
+            val endTimeStr = if (timeStr.contains("~")) timeStr.split("~")[1].trim() else ""
 
-            if (startDate != null) {
-                etStartDate.setText(dateFormat.format(startDate))
-                // 종료일이 없으면(단일 날짜 선택) 시작일과 동일하게 설정
-                val finalEndDate = endDate ?: startDate
-                etEndDate.setText(dateFormat.format(finalEndDate))
-            }
+            // ISO 형식(yyyy-MM-dd'T'HH:mm:ss)으로 변환
+            val isoStartDate = "${startDateStr}T${startTimeStr}:00"
+            val isoEndDate = "${endDateStr}T${endTimeStr}:00" 
 
-            // AlertDialog 객체 생성 (버튼은 추가하지 않음)
-            val dialog = AlertDialog.Builder(requireContext())
-                .setTitle("일정 추가")
-                .setView(dialogView)
-                .setCancelable(true)
-                .create()
+            // 스케줄 생성 요청 생성
+            val scheduleRequest = ScheduleRequest(
+                clubId = currentClubId,
+                title = title,
+                description = content.ifBlank { null },
+                place = place.ifBlank { null },
+                startDate = isoStartDate,
+                endDate = isoEndDate,
+                allDay = timeStr.isBlank()
+            )
 
-            // 저장 버튼 클릭 리스너
-            btnSave.setOnClickListener {
-                val title = etTitle.text.toString()
-                val startDateStr = etStartDate.text.toString()
-                val endDateStr = etEndDate.text.toString()
-                val timeStr = etTime.text.toString()
-                val content = etContent.text.toString()
+            // API 요청 전송
+            createSchedule(scheduleRequest)
+            dialog.dismiss()
+        }
 
-                if (title.isBlank() || startDateStr.isBlank() || endDateStr.isBlank()) {
-                    Toast.makeText(requireContext(), "제목과 날짜를 입력하세요.", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
+        // 취소 버튼 클릭 리스너
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
 
-                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                val timeSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        dialog.show()
+    }
 
-                val startDate: Date = try {
-                    if (timeStr.isNotBlank()) {
-                        // 시간이 있으면 시간 포함해서 파싱
-                        val startTime = if (timeStr.contains("~")) {
-                            timeStr.split("~")[0].trim()
-                        } else {
-                            timeStr
-                        }
-                        timeSdf.parse("$startDateStr $startTime") ?: sdf.parse(startDateStr) ?: Date()
-                    } else {
-                        sdf.parse(startDateStr) ?: Date()
+    private fun createSchedule(scheduleRequest: ScheduleRequest) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = ApiClient.apiService.createSchedule(scheduleRequest)
+                if (response.isSuccessful && response.body() != null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "일정이 추가되었습니다.", Toast.LENGTH_SHORT).show()
+                        fetchSchedules() // 일정 목록 새로고침
                     }
-                } catch (e: Exception) {
-                    try {
-                        sdf.parse(startDateStr) ?: Date()
-                    } catch (e2: Exception) {
-                        Date()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "일정 추가에 실패했습니다: ${response.message()}", Toast.LENGTH_SHORT).show()
                     }
                 }
-
-                val endDate: Date = try {
-                    if (timeStr.isNotBlank()) {
-                        // 시간이 있으면 시간 포함해서 파싱
-                        val endTime = if (timeStr.contains("~")) {
-                            timeStr.split("~")[1].trim()
-                        } else {
-                            timeStr
-                        }
-                        timeSdf.parse("$endDateStr $endTime") ?: sdf.parse(endDateStr) ?: Date()
-                    } else {
-                        sdf.parse(endDateStr) ?: Date()
-                    }
-                } catch (e: Exception) {
-                    try {
-                        sdf.parse(endDateStr) ?: Date()
-                    } catch (e2: Exception) {
-                        Date()
-                    }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(requireContext(), "오류 발생: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
-
-                val schedule = ScheduleData(
-                    scheduleId = -1,
-                    clubId = -1,
-                    title = title,
-                    description = content,
-                    startDate = startDate,
-                    endDate = endDate,
-                    allDay = false,
-                    createdBy = -1
-                )
-                scheduleList.add(schedule)
-                // 인디케이터(점) 추가
-                indicatorList.add(MyIndicator(CalendarDate(startDate), 0xFF2196F3.toInt()))
-                binding.crunchyCalendarView.datesIndicators = indicatorList
-                selectedDate?.let { filterSchedulesByDate(it) }
-                Toast.makeText(requireContext(), "일정이 추가되었습니다.", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
             }
-
-            // 취소 버튼 클릭 리스너
-            btnCancel.setOnClickListener {
-                dialog.dismiss()
-            }
-
-            dialog.show()
         }
     }
 
@@ -238,41 +224,38 @@ class ScheduleFragment : Fragment() {
         return Pair(startDate, endDate)
     }
 
-    private fun fetchSchedulesFromApi() {
-        CoroutineScope(Dispatchers.IO).launch {
+    private fun fetchSchedules() {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val url = java.net.URL("https://hide-ipv4.xyz/api/schedule")
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.requestMethod = "GET"
-                conn.connectTimeout = 5000
-                conn.readTimeout = 5000
+                // 전체 일정 또는 동아리별 일정 가져오기
+                val response = if (currentClubId > 0) {
+                    ApiClient.apiService.getSchedulesByClub(currentClubId)
+                } else {
+                    ApiClient.apiService.getAllSchedules()
+                }
+                
+                if (response.isSuccessful && response.body() != null) {
+                    val scheduleResponse = response.body()!!
+                    val tempList = mutableListOf<Schedule>()
+                    val tempIndicators = mutableListOf<ScheduleIndicator>()
 
-                val responseCode = conn.responseCode
-                if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
-                    val response = conn.inputStream.bufferedReader().use { it.readText() }
-                    val jsonArr = JSONArray(response)
-                    val tempList = mutableListOf<ScheduleData>()
-                    val tempIndicators = mutableListOf<MyIndicator>()
-
-                    for (i in 0 until jsonArr.length()) {
-                        val obj = jsonArr.getJSONObject(i)
-                        val schedule = ScheduleData(
-                            scheduleId = obj.getInt("schedule_id"),
-                            clubId = obj.getInt("club_id"),
-                            title = obj.getString("title"),
-                            description = if (obj.isNull("description")) null else obj.getString("description"),
-                            startDate = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(obj.getString("start_date")) ?: Date(),
-                            endDate = if (obj.isNull("end_date")) null else SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(obj.getString("end_date")),
-                            allDay = obj.optBoolean("all_day", false),
-                            createdBy = obj.getInt("created_by")
-                        )
+                    scheduleResponse.schedules.forEach { schedule ->
                         tempList.add(schedule)
-                        // 시작~종료 범위 모두 점 표시
+                        
+                        // 시작~종료 범위 모두 점 표시 (인디케이터 추가)
                         val cal = Calendar.getInstance()
                         cal.time = schedule.startDate
                         val end = schedule.endDate ?: schedule.startDate
+                        
+                        // 날짜별로 인디케이터 추가
                         while (!cal.time.after(end)) {
-                            tempIndicators.add(MyIndicator(CalendarDate(cal.time), 0xFF2196F3.toInt()))
+                            tempIndicators.add(
+                                ScheduleIndicator(
+                                    date = CalendarDate(cal.time),
+                                    color = getScheduleColor(schedule),
+                                    scheduleId = schedule.scheduleId
+                                )
+                            )
                             cal.add(Calendar.DATE, 1)
                         }
                     }
@@ -285,12 +268,26 @@ class ScheduleFragment : Fragment() {
                         binding.crunchyCalendarView.datesIndicators = indicatorList
                         selectedDate?.let { filterSchedulesByDate(it) }
                     }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "일정을 불러오지 못했습니다: ${response.message()}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "일정 데이터를 불러오지 못했습니다.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "일정 데이터를 불러오지 못했습니다: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    // 일정 유형에 따라 색상 지정
+    private fun getScheduleColor(schedule: Schedule): Int {
+        // 예시: 동아리 ID에 따라 색상 지정
+        return when {
+            schedule.allDay -> 0xFF9C27B0.toInt() // 하루종일 일정은 보라색
+            schedule.place?.isNotBlank() == true -> 0xFFE91E63.toInt() // 장소가 있는 일정은 분홍색
+            else -> 0xFF2196F3.toInt() // 기본은 파란색
         }
     }
 
@@ -305,20 +302,193 @@ class ScheduleFragment : Fragment() {
         cal.add(Calendar.DAY_OF_MONTH, 1)
         val endOfDay = cal.time
 
+        // 해당 날짜에 해당하는 일정 필터링
         val filtered = scheduleList.filter {
-            it.startDate >= startOfDay && it.startDate < endOfDay
+            // 일정 시작일이 선택한 날짜와 같거나,
+            // 일정 종료일이 선택한 날짜 범위 내에 있는 경우
+            (it.startDate >= startOfDay && it.startDate < endOfDay) ||
+            (it.endDate != null && it.startDate <= startOfDay && it.endDate >= startOfDay)
         }
+
+        if (filtered.isEmpty()) {
+            binding.tvScheduleList.text = "이 날짜에는 일정이 없습니다."
+            return
+        }
+
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val sb = StringBuilder()
         for (item in filtered) {
-            sb.append("제목: ${item.title}\n")
-            sb.append("설명: ${item.description ?: ""}\n")
-            sb.append("시작: ${sdf.format(item.startDate)}\n")
-            sb.append("종료: ${item.endDate?.let { sdf.format(it) } ?: ""}\n")
-            sb.append("하루종일: ${if (item.allDay) "예" else "아니오"}\n")
+            sb.append("📌 ${item.title}\n")
+            if (!item.place.isNullOrBlank()) {
+                sb.append("📍 장소: ${item.place}\n")
+            }
+            sb.append("⏰ 시간: ${sdf.format(item.startDate)} ~ ${item.endDate?.let { sdf.format(it) } ?: "미정"}\n")
+            if (!item.description.isNullOrBlank()) {
+                sb.append("📝 설명: ${item.description}\n")
+            }
+            sb.append(if (item.allDay) "[하루종일]\n" else "")
             sb.append("\n")
         }
         binding.tvScheduleList.text = sb.toString().trim()
+        
+        // 일정 클릭 가능하도록 이벤트 설정
+        binding.tvScheduleList.setOnClickListener {
+            if (filtered.isNotEmpty()) {
+                showScheduleOptions(filtered[0])
+            }
+        }
+    }
+
+    private fun showScheduleOptions(schedule: Schedule) {
+        val options = arrayOf("수정", "삭제", "취소")
+        
+        AlertDialog.Builder(requireContext())
+            .setTitle(schedule.title)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showEditScheduleDialog(schedule)
+                    1 -> confirmDeleteSchedule(schedule)
+                }
+            }
+            .show()
+    }
+
+    private fun showEditScheduleDialog(schedule: Schedule) {
+        // 수정 다이얼로그 표시 - 기존 일정 정보 채우기
+        val dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_add_schedule, null, false)
+
+        // 다이얼로그 내 뷰 설정
+        val etTitle = dialogView.findViewById<EditText>(R.id.etTitle)
+        val etStartDate = dialogView.findViewById<EditText>(R.id.etStartDate)
+        val etEndDate = dialogView.findViewById<EditText>(R.id.etEndDate)
+        val etTime = dialogView.findViewById<EditText>(R.id.etTime)
+        val etPlace = dialogView.findViewById<EditText>(R.id.etPlace)
+        val etContent = dialogView.findViewById<EditText>(R.id.etContent)
+
+        // 기존 데이터 채우기
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+        etTitle.setText(schedule.title)
+        etStartDate.setText(dateFormat.format(schedule.startDate))
+        etEndDate.setText(schedule.endDate?.let { dateFormat.format(it) } ?: dateFormat.format(schedule.startDate))
+        
+        if (!schedule.allDay) {
+            val startTime = timeFormat.format(schedule.startDate)
+            val endTime = schedule.endDate?.let { timeFormat.format(it) } ?: startTime
+            etTime.setText("$startTime ~ $endTime")
+        }
+        
+        etPlace.setText(schedule.place ?: "")
+        etContent.setText(schedule.description ?: "")
+
+        // 다이얼로그 빌더 생성
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("일정 수정")
+            .setView(dialogView)
+            .create()
+
+        // 저장 버튼 클릭 리스너
+        dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSave).setOnClickListener {
+            // 수정된 데이터 가져오기
+            val title = etTitle.text.toString()
+            val startDateStr = etStartDate.text.toString()
+            val endDateStr = etEndDate.text.toString()
+            val timeStr = etTime.text.toString()
+            val place = etPlace.text.toString()
+            val content = etContent.text.toString()
+
+            if (title.isBlank() || startDateStr.isBlank()) {
+                Toast.makeText(requireContext(), "제목과 시작 날짜는 필수입니다.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // 날짜와 시간 파싱
+            val startTimeStr = if (timeStr.contains("~")) timeStr.split("~")[0].trim() else ""
+            val endTimeStr = if (timeStr.contains("~")) timeStr.split("~")[1].trim() else ""
+
+            // ISO 형식(yyyy-MM-dd'T'HH:mm:ss)으로 변환
+            val isoStartDate = "${startDateStr}T${startTimeStr}:00"
+            val isoEndDate = "${endDateStr}T${endTimeStr}:00" 
+
+            // 스케줄 업데이트 요청 생성
+            val scheduleRequest = ScheduleRequest(
+                clubId = schedule.clubId,
+                title = title,
+                description = content.ifBlank { null },
+                place = place.ifBlank { null },
+                startDate = isoStartDate,
+                endDate = isoEndDate,
+                allDay = timeStr.isBlank()
+            )
+
+            // 업데이트 API 요청
+            updateSchedule(schedule.scheduleId, scheduleRequest)
+            dialog.dismiss()
+        }
+
+        // 취소 버튼 클릭 리스너
+        dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel).setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    private fun updateSchedule(scheduleId: Int, request: ScheduleRequest) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = ApiClient.apiService.updateSchedule(scheduleId, request)
+                if (response.isSuccessful) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "일정이 수정되었습니다.", Toast.LENGTH_SHORT).show()
+                        fetchSchedules() // 일정 목록 새로고침
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "일정 수정에 실패했습니다: ${response.message()}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(requireContext(), "오류 발생: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun confirmDeleteSchedule(schedule: Schedule) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("일정 삭제")
+            .setMessage("\"${schedule.title}\" 일정을 삭제하시겠습니까?")
+            .setPositiveButton("삭제") { _, _ ->
+                deleteSchedule(schedule.scheduleId)
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun deleteSchedule(scheduleId: Int) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = ApiClient.apiService.deleteSchedule(scheduleId)
+                if (response.isSuccessful) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "일정이 삭제되었습니다.", Toast.LENGTH_SHORT).show()
+                        fetchSchedules() // 일정 목록 새로고침
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "일정 삭제에 실패했습니다: ${response.message()}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(requireContext(), "오류 발생: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     override fun onDestroyView() {
